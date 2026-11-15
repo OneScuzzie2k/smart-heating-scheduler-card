@@ -1,9 +1,10 @@
 # 0.3.0-dev.3 - mini-card preview
 
 - Add an optional one-zone mini thermostat/boost layout with manual target and boost-duration sliders, native thermostat details, Resume schedule and dashboard link.
+- Make the 270-degree thermostat dial interactive: pointer/touch drag, arc click, snapped preview, one command on release, keyboard steps and visible handle/focus. Preserve pointer capture across incoming snapshots; cancellation, unavailability and ownership guards prevent commands.
 - Add layout and zone selection to the visual editor and a disconnected `/mini` design preview.
 - Manual targets respect observed live mode, reviewed bounds, availability and boost/holiday guards. No backend change required.
-- Validation: 27 frontend tests, including mini zone isolation and guarded mapped-climate calls.
+- Validation: 32 frontend tests, including mini zone isolation, guarded mapped-climate calls, dial geometry, drag/release/cancel, incoming snapshots, keyboard focus and disabled/fault conditions.
 
 # 0.3.0-dev.2
 

@@ -139,6 +139,8 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
 .mini{padding:16px;background:var(--shs-panel);border:1px solid var(--shs-line);border-radius:18px}.mini .section-head{margin-bottom:4px}.mini h2{font-size:17px}:host([theme=light]){color-scheme:light}.mini-mode{color:var(--shs-muted);font-size:11px;margin-bottom:12px}.mini .ring{max-width:165px;margin-bottom:8px}.mini .reading{font-size:32px}.mini-slider{display:block;margin:8px 0;color:var(--shs-muted);font-size:12px}.mini-slider input[type=range]{display:block;width:100%;min-height:28px;padding:0;border:0;accent-color:var(--shs-orange-fill);background:transparent}.mini-slider output{float:right;color:var(--shs-ink)}.mini-boost{margin-top:15px;border-top:1px solid var(--shs-line)}.mini-occupancy{color:var(--shs-teal);font-size:11px;margin:12px 0}.mini .toolbar{justify-content:space-between;margin-top:12px}.mini .toolbar button,.mini .toolbar a{font-size:11px}.mini .boost-controls button{font-size:12px}
 
 .mini-slider input[type=range]{appearance:none;-webkit-appearance:none;cursor:pointer}.mini-slider input[type=range]::-webkit-slider-runnable-track{height:8px;background:var(--shs-track);border-radius:6px}.mini-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--shs-orange-fill);margin-top:-6px;box-shadow:0 1px 3px #0003}.mini-slider input[type=range]::-moz-range-track{height:8px;background:var(--shs-track);border-radius:6px}.mini-slider input[type=range]::-moz-range-thumb{width:16px;height:16px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--shs-orange-fill)}
+
+.mini-dial{touch-action:none;user-select:none;cursor:grab;border-radius:50%}.mini-dial:active{cursor:grabbing}.mini-dial[aria-disabled=true]{cursor:default;opacity:.7}.mini-dial:focus-visible{outline:3px solid var(--shs-teal);outline-offset:7px}.mini-dial .dial-thumb{position:absolute;inset:0;transform:rotate(calc(225deg + var(--fill)*1deg));pointer-events:none}.mini-dial .dial-thumb:after{content:'';position:absolute;left:calc(50% - 8px);top:-2px;width:16px;height:16px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--shs-orange-fill);box-shadow:0 1px 4px #0004}.idle .mini-dial .dial-thumb:after{background:var(--shs-teal)}.dial-hint{display:block;text-align:center;color:var(--shs-muted);font-size:11px;margin:0 0 10px}
 `;
 
   // src/occupancy-ui.js
@@ -196,12 +198,79 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
   };
 
   // src/mini-ui.js
+  function dialTemperature(limits, x, y, rect, unit = "\xB0C") {
+    if (!rect.width || !rect.height || ![x, y].every(Number.isFinite)) return null;
+    const angle = (Math.atan2(x - rect.left - rect.width / 2, rect.top + rect.height / 2 - y) * 180 / Math.PI + 360) % 360;
+    let sweep = (angle - 225 + 360) % 360;
+    if (sweep > 270) sweep = sweep > 315 ? 0 : 270;
+    const step = limits.step || (unit === "\xB0F" ? 1 : 0.5);
+    const raw = limits.minimum + sweep / 270 * (limits.maximum - limits.minimum);
+    return Number(Math.max(limits.minimum, Math.min(limits.maximum, Math.round(raw / step) * step)).toFixed(6));
+  }
   var miniUI = {
     _miniZone() {
       return this._config.zone_id ? this._data?.zones.find((z) => z.id === this._config.zone_id) : this._zone();
     },
     _miniCanSet(z) {
       return !!(z && this._canEdit() && !this._saving && (this._config.demo || !this._data.observe_only) && z.enabled && z.mode === "heat" && !z.boost.active && !z.smart?.external_operation && !["holiday", "unavailable", "unsupported", "error", "disabled", "boost_unknown", "boost_handover"].includes(z.source) && !z.error);
+    },
+    _previewMiniTarget(value) {
+      const z = this._miniZone();
+      if (!z || value === null) return;
+      this._miniTarget = value;
+      const ring = this.shadowRoot.querySelector("[data-mini-dial]");
+      const fill = Math.max(0, Math.min(270, (value - z.limits.minimum) / (z.limits.maximum - z.limits.minimum) * 270));
+      if (ring) {
+        ring.style.setProperty("--fill", fill);
+        ring.setAttribute("aria-valuenow", value);
+        ring.setAttribute("aria-valuetext", this._temp(value, z.unit));
+      }
+      const output = this.shadowRoot.querySelector("[data-mini-reading]");
+      if (output) output.textContent = this._temp(value, z.unit);
+      const slider = this.shadowRoot.querySelector("[data-mini-target]");
+      if (slider) slider.value = value;
+    },
+    _miniDialDown(event) {
+      const dial = event.target.closest("[data-mini-dial]"), z = this._miniZone();
+      if (!dial || !this._miniCanSet(z) || this._dialDrag || event.button !== 0 || event.isPrimary === false) return;
+      const rect = dial.getBoundingClientRect();
+      const radius = Math.hypot((event.clientX - rect.left - rect.width / 2) / rect.width, (event.clientY - rect.top - rect.height / 2) / rect.height);
+      if (radius < 0.28 || radius > 0.62) return;
+      event.preventDefault();
+      dial.focus({ preventScroll: true });
+      this._dialDrag = { id: event.pointerId, zone: z.id, dial, rect };
+      dial.setPointerCapture?.(event.pointerId);
+      this._previewMiniTarget(dialTemperature(z.limits, event.clientX, event.clientY, rect, z.unit));
+    },
+    _miniDialMove(event) {
+      const drag = this._dialDrag, z = this._miniZone();
+      if (!drag || drag.id !== event.pointerId || z?.id !== drag.zone) return;
+      event.preventDefault();
+      this._previewMiniTarget(dialTemperature(z.limits, event.clientX, event.clientY, drag.rect, z.unit));
+    },
+    _miniDialEnd(event, cancel = false) {
+      const drag = this._dialDrag;
+      if (!drag || drag.id !== event.pointerId) return;
+      const value = this._miniTarget;
+      this._dialDrag = null;
+      if (drag.dial.hasPointerCapture?.(event.pointerId)) drag.dial.releasePointerCapture(event.pointerId);
+      if (cancel || this._miniZone()?.id !== drag.zone || !this._miniCanSet(this._miniZone())) {
+        this._miniTarget = null;
+        this._render();
+        return;
+      }
+      void this._miniSetTarget(value);
+    },
+    _miniDialKey(event) {
+      if (!event.target.matches("[data-mini-dial]") || !this._miniCanSet(this._miniZone())) return;
+      const z = this._miniZone(), step = z.limits.step || (z.unit === "\xB0F" ? 1 : 0.5), current = Number(this._miniTarget ?? z.device_target ?? z.limits.minimum);
+      const offsets = { ArrowRight: step, ArrowUp: step, ArrowLeft: -step, ArrowDown: -step, PageUp: step * 10, PageDown: -step * 10 };
+      let value = event.key === "Home" ? z.limits.minimum : event.key === "End" ? z.limits.maximum : current + offsets[event.key];
+      if (!Number.isFinite(value)) return;
+      event.preventDefault();
+      value = Number(Math.max(z.limits.minimum, Math.min(z.limits.maximum, value)).toFixed(6));
+      this._previewMiniTarget(value);
+      void this._miniSetTarget(value);
     },
     async _miniSetTarget(raw) {
       const z = this._miniZone();
@@ -244,7 +313,8 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       const href = this._config.dashboard_path?.startsWith("/") && !this._config.dashboard_path.startsWith("//") ? this._config.dashboard_path : null;
       return `<section class="wrap mini ${z.hvac_action === "heating" ? "" : "idle"}" aria-label="${escapeHTML(z.name)} mini thermostat"><div class="section-head"><h2>${escapeHTML(this._config.title || z.name)}</h2><button type="button" class="link-button" data-action="more" data-zone="${escapeHTML(z.id)}" aria-label="Open native thermostat" ${z.climate_entity ? "" : "disabled"}>\u2197</button></div>
       <div class="mini-mode">${this._config.demo ? "Sample data" : this._data.observe_only ? "Observe only" : "Heating control"} \xB7 ${escapeHTML(caption)}</div>
-      <div class="ring" style="--fill:${fill}"><small>Target temperature</small><div class="reading" data-mini-reading>${escapeHTML(this._temp(Number(target), z.unit))}</div><small>Room ${escapeHTML(this._temp(z.current_temperature, z.unit))}</small></div>
+      <div class="ring mini-dial" data-mini-dial role="slider" tabindex="${canSet ? "0" : "-1"}" aria-label="Target temperature dial" aria-valuemin="${z.limits.minimum}" aria-valuemax="${z.limits.maximum}" aria-valuenow="${escapeHTML(target)}" aria-valuetext="${escapeHTML(this._temp(Number(target), z.unit))}" aria-disabled="${!canSet}" style="--fill:${fill}"><span class="dial-thumb" aria-hidden="true"></span><small>Target temperature</small><div class="reading" data-mini-reading>${escapeHTML(this._temp(Number(target), z.unit))}</div><small>Room ${escapeHTML(this._temp(z.current_temperature, z.unit))}</small></div>
+      <small class="dial-hint">${canSet ? "Drag the dial or tap its arc to adjust" : "Temperature dial unavailable"}</small>
       <label class="mini-slider">Target temperature<input type="range" data-mini-target aria-label="Target temperature" min="${z.limits.minimum}" max="${z.limits.maximum}" step="${z.limits.step || (z.unit === "\xB0F" ? 1 : 0.5)}" value="${escapeHTML(target)}" ${canSet ? "" : "disabled"}></label>
       <small>${z.source === "manual" ? "Manual override" : z.mode === "off" ? "Resume schedule to turn heating on" : this._config.demo ? "Preview manual target \xB7 no heating commands" : this._data.observe_only ? "Thermostat changes disabled in observe-only mode" : "Changes use this zone\u2019s manual hold policy"}</small>
       <div class="mini-boost" data-smart-zone="${escapeHTML(z.id)}"><input type="hidden" data-boost="target" value="${escapeHTML(p?.boost_target ?? "")}"><label class="mini-slider">Boost time <output data-mini-minutes>${escapeHTML(duration)} minutes</output><input type="range" data-boost="minutes" aria-label="Boost duration" min="${min}" max="${max}" step="${durationStep}" value="${escapeHTML(duration)}" ${disabled || p?.boost_owner === "external" && !p.duration_helper ? "disabled" : ""}></label><div class="boost-controls"><small>${z.boost.active ? escapeHTML(remainingText(z.boost.until, this._now())) : p?.boost_target !== null ? "Boost to " + escapeHTML(this._temp(p?.boost_target, z.unit)) : "Boost not configured"}</small><button type="button" class="primary" data-action="smart-${z.boost.active ? "boost-cancel" : "boost-start"}" data-zone="${escapeHTML(z.id)}" ${boostDisabled ? "disabled" : ""}>${z.boost.active ? "Stop boost" : "Start boost"}</button></div></div>
@@ -522,6 +592,11 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       this._generation = 0;
       this._retryDelay = 2e3;
       this._unsub = null;
+      this.shadowRoot.addEventListener("pointerdown", (event) => this._miniDialDown(event));
+      this.shadowRoot.addEventListener("pointermove", (event) => this._miniDialMove(event));
+      this.shadowRoot.addEventListener("pointerup", (event) => this._miniDialEnd(event));
+      this.shadowRoot.addEventListener("pointercancel", (event) => this._miniDialEnd(event, true));
+      this.shadowRoot.addEventListener("lostpointercapture", (event) => this._miniDialEnd(event, true));
       this.shadowRoot.addEventListener("click", (event) => {
         const target = event.target.closest("button[data-action]");
         if (target && !target.disabled) this._action(target.dataset.action, target.dataset);
@@ -553,11 +628,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       });
       this.shadowRoot.addEventListener("input", (event) => {
         const target = event.target;
-        if (target.hasAttribute("data-mini-target")) {
-          this._miniTarget = target.value;
-          const out = this.shadowRoot.querySelector("[data-mini-reading]");
-          if (out) out.textContent = this._temp(Number(target.value), this._miniZone()?.unit);
-        }
+        if (target.hasAttribute("data-mini-target")) this._previewMiniTarget(Number(target.value));
         if (target.dataset.boost === "minutes") {
           const out = this.shadowRoot.querySelector("[data-mini-minutes]");
           if (out) out.textContent = target.value + " minutes";
@@ -586,6 +657,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
         if (this._dialog?.kind === "period" && event.target.dataset.field) this._dialog.edit[event.target.dataset.field] = event.target.value;
       });
       this.shadowRoot.addEventListener("keydown", (event) => {
+        this._miniDialKey(event);
         if (event.key === "Escape" && this._dialog && !this._saving) {
           event.preventDefault();
           this._dialog = null;
@@ -619,6 +691,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       return { columns: 12, rows: "auto", min_columns: 3 };
     }
     setConfig(config) {
+      if (this._dialDrag) {
+        this._dialDrag = null;
+        this._miniTarget = null;
+      }
       if (config.layout && !["full", "mini"].includes(config.layout)) throw Error("Choose full or mini layout.");
       if (config.theme && !["auto", "dark", "light"].includes(config.theme)) throw Error("Choose auto, dark or light theme.");
       if (config.view && !VIEWS[config.view]) throw Error("Unknown heating view.");
@@ -660,6 +736,8 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }, 6e4);
     }
     disconnectedCallback() {
+      this._dialDrag = null;
+      this._miniTarget = null;
       this._stop();
       clearInterval(this._clock);
       window.removeEventListener("beforeunload", this._beforeUnload);
@@ -1053,6 +1131,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
     }
     _render() {
       if (!this._config) return;
+      if (this._dialDrag) return;
       this._applyTheme();
       const active = this.shadowRoot.activeElement;
       const focus = active ? { action: active.dataset.action, field: active.dataset.field, index: active.dataset.index, day: active.dataset.day, view: active.dataset.view, zone: active.dataset.zone, aria: active.getAttribute("aria-label"), tag: active.tagName } : null;
@@ -1074,7 +1153,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
         queueMicrotask(() => (this.shadowRoot.querySelector(".modal input:not([readonly])") || this.shadowRoot.querySelector(".modal button"))?.focus());
       } else if (restoreFocus) {
         const f = restoreFocus;
-        const element = [...this.shadowRoot.querySelectorAll("button,input,select")].find((el) => el.tagName === f.tag && el.dataset.action === f.action && el.dataset.field === f.field && el.dataset.index === f.index && el.dataset.day === f.day && el.dataset.view === f.view && el.dataset.zone === f.zone && el.getAttribute("aria-label") === f.aria);
+        const element = [...this.shadowRoot.querySelectorAll("button,input,select,[data-mini-dial]")].find((el) => el.tagName === f.tag && el.dataset.action === f.action && el.dataset.field === f.field && el.dataset.index === f.index && el.dataset.day === f.day && el.dataset.view === f.view && el.dataset.zone === f.zone && el.getAttribute("aria-label") === f.aria);
         element?.focus({ preventScroll: true });
       }
     }

@@ -21,6 +21,35 @@ test('stale saves retain draft and make the conflict actionable',async()=>{const
 const settle=()=>new Promise(r=>setTimeout(r,0));
 function setSmart(h,key,value){const input=h.root.querySelector(`[data-smart-field="${key}"]`);assert.ok(input,key);input.value=value;input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));}
 
+test('round dial previews drag without sending commands, survives snapshots and commits once on release',async()=>{
+  const h=await setup({demo:true,layout:'mini',zone_id:'lounge'});try{
+    const calls=[];h.card._config.demo=false;h.card._status='connected';h.card._data.observe_only=false;h.card._miniZone().climate_entity='climate.test_lounge';h.card._hass={callService:async(...args)=>calls.push(args)};
+    h.card._render();const dial=h.root.querySelector('[data-mini-dial]');dial.getBoundingClientRect=()=>({left:100,top:100,width:200,height:200});
+    const pointer=(type,x,y)=>dial.dispatchEvent(new h.dom.window.MouseEvent(type,{bubbles:true,cancelable:true,clientX:x,clientY:y,button:0}));
+    pointer('pointerdown',200,100);assert.equal(dial.getAttribute('aria-valuenow'),'22');pointer('pointermove',300,200);assert.equal(calls.length,0);assert.equal(dial.getAttribute('aria-valuenow'),'26');
+    h.card._receive(structuredClone(h.card._data));assert.equal(h.root.querySelector('[data-mini-dial]'),dial);
+    pointer('pointerup',300,200);await settle();assert.equal(calls.length,1);assert.equal(calls[0][2].temperature,26);assert.equal(calls[0][3].entity_id,'climate.test_lounge');assert.equal(h.card._dialDrag,null);
+  }finally{h.close();}
+});
+
+test('round dial cancellation, disabled mode and a fault during dragging never command heating',async()=>{
+  const h=await setup({demo:true,layout:'mini',zone_id:'lounge'});try{
+    const calls=[];h.card._config.demo=false;h.card._status='connected';h.card._data.observe_only=false;h.card._hass={callService:async(...args)=>calls.push(args)};h.card._render();
+    function pointer(type){const d=h.root.querySelector('[data-mini-dial]');d.getBoundingClientRect=()=>({left:100,top:100,width:200,height:200});d.dispatchEvent(new h.dom.window.MouseEvent(type,{bubbles:true,cancelable:true,clientX:200,clientY:100,button:0}));}
+    pointer('pointerdown');pointer('pointercancel');await settle();assert.equal(calls.length,0);assert.equal(h.card._miniTarget,null);
+    h.card._data.observe_only=true;pointer('pointerdown');assert.equal(h.card._dialDrag,null);
+    h.card._data.observe_only=false;pointer('pointerdown');h.card._miniZone().mode='unavailable';pointer('pointerup');await settle();assert.equal(calls.length,0);
+  }finally{h.close();}
+});
+
+test('round dial supports keyboard steps and bounds while keeping keyboard focus',async()=>{
+  const h=await setup({demo:true,layout:'mini',zone_id:'lounge'});try{
+    const key=async(value)=>{const d=h.root.querySelector('[data-mini-dial]');d.focus();d.dispatchEvent(new h.dom.window.KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true}));await settle();};
+    await key('ArrowRight');assert.equal(h.card._miniZone().device_target,20.5);assert.equal(h.root.activeElement,h.root.querySelector('[data-mini-dial]'));
+    await key('Home');assert.equal(h.card._miniZone().device_target,16);await key('End');assert.equal(h.card._miniZone().device_target,28);
+  }finally{h.close();}
+});
+
 test('mini card isolates the chosen zone, target slider and shared boost controls',async()=>{
   const h=await setup({demo:true,layout:'mini',zone_id:'lounge',theme:'light'});try{
     assert.equal(h.root.querySelector('nav'),null);assert.match(h.root.querySelector('h2').textContent,/Lounge/);assert.equal(h.card.getGridOptions().columns,6);

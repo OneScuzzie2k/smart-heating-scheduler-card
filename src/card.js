@@ -16,6 +16,11 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     this._draft = null; this._history = []; this._revision = null; this._dialog = null;
     this._error = ''; this._message = ''; this._saving = false; this._status = 'waiting';
     this._generation = 0; this._retryDelay = 2000; this._unsub = null;
+    this.shadowRoot.addEventListener('pointerdown',event=>this._miniDialDown(event));
+    this.shadowRoot.addEventListener('pointermove',event=>this._miniDialMove(event));
+    this.shadowRoot.addEventListener('pointerup',event=>this._miniDialEnd(event));
+    this.shadowRoot.addEventListener('pointercancel',event=>this._miniDialEnd(event,true));
+    this.shadowRoot.addEventListener('lostpointercapture',event=>this._miniDialEnd(event,true));
     this.shadowRoot.addEventListener('click', event => {
       const target = event.target.closest('button[data-action]');
       if (target && !target.disabled) this._action(target.dataset.action, target.dataset);
@@ -39,7 +44,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     });
     this.shadowRoot.addEventListener('input', event => {
       const target=event.target;
-      if(target.hasAttribute('data-mini-target')){this._miniTarget=target.value;const out=this.shadowRoot.querySelector('[data-mini-reading]');if(out)out.textContent=this._temp(Number(target.value),this._miniZone()?.unit);}
+      if(target.hasAttribute('data-mini-target'))this._previewMiniTarget(Number(target.value));
       if(target.dataset.boost==='minutes'){const out=this.shadowRoot.querySelector('[data-mini-minutes]');if(out)out.textContent=target.value+' minutes';}
       if(target.dataset.boost){this._boostInputs ||= {};const zone=target.closest('[data-smart-zone]').dataset.smartZone;this._boostInputs[zone] ||= {};this._boostInputs[zone][target.dataset.boost]=target.value;}
       if(target.dataset.smartField || target.dataset.presenceIndex!==undefined){this._smartPolicyRevisions ||= {};this._smartPolicyRevisions[this._zone().id] ??= this._zone().smart?.policy_revision;}
@@ -48,6 +53,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
       if (this._dialog?.kind === 'period' && event.target.dataset.field) this._dialog.edit[event.target.dataset.field] = event.target.value;
     });
     this.shadowRoot.addEventListener('keydown', event => {
+      this._miniDialKey(event);
       if (event.key === 'Escape' && this._dialog && !this._saving) { event.preventDefault(); this._dialog = null; this._render(); }
       if (event.key === 'Tab' && this._dialog) this._trapFocus(event);
     });
@@ -59,6 +65,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
   getCardSize() { if(this._config?.layout==='mini')return 6; return this._view === 'schedules' ? 12 : 10; }
   getGridOptions() { if(this._config?.layout==='mini')return {columns:6,rows:'auto',min_columns:3}; return {columns:12, rows:'auto', min_columns:3}; }
   setConfig(config) {
+    if(this._dialDrag){this._dialDrag=null;this._miniTarget=null;}
     if(config.layout && !['full','mini'].includes(config.layout))throw Error('Choose full or mini layout.');
     if (config.theme && !['auto','dark','light'].includes(config.theme)) throw Error('Choose auto, dark or light theme.');
     if (config.view && !VIEWS[config.view]) throw Error('Unknown heating view.');
@@ -83,7 +90,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     this._connect(); this._render();
     this._clock = setInterval(() => { if (!this._draft && !this._dialog && !this.shadowRoot.activeElement?.matches('input,select') && !this._config?.demo) this._render(); }, 60000);
   }
-  disconnectedCallback() { this._stop(); clearInterval(this._clock); window.removeEventListener('beforeunload', this._beforeUnload); }
+  disconnectedCallback() { this._dialDrag=null;this._miniTarget=null;this._stop(); clearInterval(this._clock); window.removeEventListener('beforeunload', this._beforeUnload); }
   _stop() {
     this._generation++; clearTimeout(this._retry);
     if (this._unsub) { this._unsub(); this._unsub = null; }
@@ -290,6 +297,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
   }
   _render() {
     if (!this._config) return;
+    if(this._dialDrag)return; // Keep pointer capture while incoming snapshots update data.
     this._applyTheme();
     const active = this.shadowRoot.activeElement;
     const focus = active ? {action:active.dataset.action, field:active.dataset.field, index:active.dataset.index, day:active.dataset.day, view:active.dataset.view, zone:active.dataset.zone, aria:active.getAttribute('aria-label'), tag:active.tagName} : null;
@@ -301,7 +309,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     this.shadowRoot.innerHTML=this._config.layout==='mini'&&this._data?.zones?.length?`<style>${styles}</style>${this._mini()}`:`<style>${styles}</style><div class="wrap"><div class="header"><div class="brand"><span class="brand-icon" aria-hidden="true">♨︎</span><div><h1>${e(this._config.title)}</h1><p>Comfort, on your schedule.</p></div></div><span class="badge"><span class="dot" aria-hidden="true"></span>${this._config.demo?'Design preview':this._data?.observe_only===false?'Heating control':'Observe only'}</span></div><div class="preview-banner"><strong>${this._config.demo?'Sample data':this._data?.observe_only===false?'Heating control enabled':'Heating controls unchanged'}</strong> · ${this._config.demo?'Disconnected from Home Assistant':this._status==='connected'?'Connected to scheduler':this._status==='reconnecting'?'Reconnecting…':'Waiting for scheduler'}</div><nav class="nav" aria-label="Heating views">${Object.entries(VIEWS).map(([key,[icon,name]])=>`<button type="button" data-action="nav" data-view="${key}" aria-current="${key===this._view?'page':'false'}"><span class="nav-icon" aria-hidden="true">${icon}</span>${name}</button>`).join('')}</nav>${this._error?`<div class="error" role="alert">${e(this._error)}</div>`:''}${this._message?`<div class="success" role="status">${e(this._message)}</div>`:''}<main ${this._saving?'aria-busy="true"':''}>${content}</main></div>${this._modal()}`;
     if (this._dialog) { this.shadowRoot.querySelector('.wrap').inert=true; this.shadowRoot.querySelector('.wrap').setAttribute('aria-hidden','true'); }
     if (this._focusDialog) { this._focusDialog=false; queueMicrotask(()=>(this.shadowRoot.querySelector('.modal input:not([readonly])') || this.shadowRoot.querySelector('.modal button'))?.focus()); }
-    else if (restoreFocus) { const f=restoreFocus; const element=[...this.shadowRoot.querySelectorAll('button,input,select')].find(el=>el.tagName===f.tag&&el.dataset.action===f.action&&el.dataset.field===f.field&&el.dataset.index===f.index&&el.dataset.day===f.day&&el.dataset.view===f.view&&el.dataset.zone===f.zone&&el.getAttribute('aria-label')===f.aria); element?.focus({preventScroll:true}); }
+    else if (restoreFocus) { const f=restoreFocus; const element=[...this.shadowRoot.querySelectorAll('button,input,select,[data-mini-dial]')].find(el=>el.tagName===f.tag&&el.dataset.action===f.action&&el.dataset.field===f.field&&el.dataset.index===f.index&&el.dataset.day===f.day&&el.dataset.view===f.view&&el.dataset.zone===f.zone&&el.getAttribute('aria-label')===f.aria); element?.focus({preventScroll:true}); }
   }
 }
 

@@ -16,7 +16,7 @@ Open preview.html from the development test package. It is disconnected, uses sa
 
 ## Working controls
 
-Mini-card preview: choose **Mini thermostat & boost** in the visual card editor, then select a scheduler and heating zone. The mini layout has the thermostat target and room reading, a manual-target slider, boost-time slider, shared boost start/stop, Resume schedule and an optional link to the full dashboard. It uses the same resource and integration. Test the disconnected example at `/mini` on the local demo server.
+Mini-card preview: choose **Mini thermostat & boost** in the visual card editor, then select a scheduler and heating zone. Drag the circular thermostat handle or tap the arc to preview a temperature; releasing sends one manual-target change. Arrow keys adjust by one temperature step; Home/End choose the bounds. A cancelled drag sends nothing. The target slider remains available as an alternative. The mini layout also has the room reading, boost-time slider, shared boost start/stop, Resume schedule and an optional link to the full dashboard. It uses the same resource and integration. Test the disconnected example at `/mini` on the local demo server.
 
 ```yaml
 type: custom:smart-heating-scheduler-card
