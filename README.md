@@ -1,0 +1,50 @@
+# Smart Heating Scheduler Card - Phase 3 development candidate
+
+A self-contained Lovelace custom card following the approved orange/teal designs. Rounded thermostat panels, HA-aware dark/light themes, side-by-side desktop zones and stacked mobile controls. No runtime CDN or third-party card dependency.
+
+![Scheduler preview](docs/preview.jpg)
+
+## Install through HACS / Marketplace
+
+Add `https://github.com/OneScuzzie2k/smart-heating-scheduler-card` as a custom **Dashboard** repository and download it. Install [the backend integration](https://github.com/OneScuzzie2k/smart-heating-scheduler) separately as an **Integration** repository. On HA 2026.11, use Settings > Marketplace. Choose the default branch for this initial development preview if no release is listed.
+
+Allow the Marketplace/HACS to register the JavaScript resource, then reload the browser. For YAML-managed resources, follow the resource path/type shown in its install dialog. Add Smart Heating Scheduler in the dashboard card picker, choose the config entry and confirm **Observe only**. No real heating command is sent in that mode.
+
+## Try it
+
+Open preview.html from the development test package. It is disconnected, uses sample data and resets on reload. Try boost start/stop on Dashboard; Home/Away overrides and holiday on Automation; boost adapter settings under Settings. Advance demo clock 30 minutes on Automation to see expiry. The demo models manual overrides and timed controls; actual sensor aggregation runs in the HA backend and is covered by backend tests.
+
+## Working controls
+
+- Dashboard measurements/device targets/proposals stay distinct, with control-source explanations and boost countdowns.
+- Weekly schedule editor: desktop timelines, phone day/period list, explicit time/target/label editor, split/delete, day/week copy, undo, save/cancel and revision conflicts.
+- Boost target/duration/start/cancel with backend capability checks and acknowledged holiday exceptions.
+- Presence selection, explicit Home/Away states, any/all, configurable delays/unknown fallback, occupied comfort window and expiring manual overrides.
+- Holiday start/return in HA local time, per-zone target, conflict behaviour and cancellation. DST gaps/repeated-hour input is rejected clearly.
+- Adapter settings for built-in boost or fixed-target external scripts, timer, optional helper and filtered completion event.
+- Connected mode shows Observe only or Heating control explicitly. Admin mutation controls and policy revisions are enforced by the backend.
+
+Use Settings > Heating control mode only in a reviewed test environment. Enabling it permits real climate/script/helper calls; it requires the exact acknowledgement shown in the UI. It is disabled in the disconnected demo. Test the browser preview without changing live HA.
+
+## Development
+
+```powershell
+npm ci
+npm run build
+npm test
+npm run demo
+```
+
+Local demo: http://127.0.0.1:18765/. Distribution bundle: dist/smart-heating-scheduler-card.js. The same compiled custom element is used in the preview and HA.
+
+```yaml
+type: custom:smart-heating-scheduler-card
+entry_id: YOUR_CONFIG_ENTRY_ID
+title: Heating Control
+theme: auto
+view: dashboard
+```
+
+The visual card editor selects entry/title/theme/view. Leave demo out for connected data. Browser clocks are for display only; the backend owns real deadlines and commands. No HA URL/token or home mapping is embedded in sample previews.
+
+Full HA browser installation, physical devices, screen readers, 200% zoom, broader themes and translations still require release validation. Development source is prepared for public GitHub custom-repository installation; it is not a catalog-listed stable release or a production deployment. MIT licensed. Bulk holiday scope and defaults/inheritance remain follow-up work; current smart rules are independent per zone.

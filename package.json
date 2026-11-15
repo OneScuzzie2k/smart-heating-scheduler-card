@@ -1,0 +1,15 @@
+{
+  "name": "smart-heating-scheduler-card",
+  "version": "0.3.0-dev.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.js",
+    "demo": "node demo/server.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "jsdom": "29.1.1"
+  }
+}

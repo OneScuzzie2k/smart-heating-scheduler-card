@@ -1,0 +1,6 @@
+{
+  "name": "Smart Heating Scheduler Card",
+  "filename": "smart-heating-scheduler-card.js",
+  "homeassistant": "2026.11.1",
+  "render_readme": true
+}

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Heating Scheduler — design preview</title>
+<style>
+html{color-scheme:dark light}body{margin:0;background:light-dark(#e4ebf0,#091119);font-family:Roboto,'Segoe UI',sans-serif}#stage{max-width:1160px;margin:24px auto;padding:0 14px}.demo-tools{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;padding:14px;color:light-dark(#233e4f,#b5c5d2);font-size:13px}.demo-tools button{font:inherit;min-height:44px;background:light-dark(#fff,#17232d);color:light-dark(#172c3a,#eff5fa);border:1px solid light-dark(#a6b6c2,#344854);border-radius:12px;padding:9px 16px;cursor:pointer}.demo-tools button:focus-visible{outline:3px solid #24b8c4;outline-offset:3px}#stage.phone{max-width:390px;padding:0}#stage.phone smart-heating-scheduler-card{border:1px solid #344854;border-radius:24px;display:block} @media(max-width:480px){#stage{margin:0 auto;padding:0}.demo-tools{padding:8px}}
+</style></head><body>
+<div class="demo-tools"><span>Disconnected design preview</span><button type="button" data-size="desktop">Desktop layout</button><button type="button" data-size="phone">Mobile layout</button><button type="button" id="theme">Switch theme</button></div>
+<div id="stage"><smart-heating-scheduler-card id="preview"></smart-heating-scheduler-card></div>
+<script src="/card.js"></script>
+<script>
+const card=document.getElementById('preview'); let theme='dark'; card.setConfig({demo:true,theme});
+document.querySelectorAll('[data-size]').forEach(button=>button.addEventListener('click',()=>document.getElementById('stage').classList.toggle('phone',button.dataset.size==='phone')));
+document.getElementById('theme').addEventListener('click',()=>{theme=theme==='dark'?'light':'dark';card.setConfig({demo:true,theme});});
+</script></body></html>

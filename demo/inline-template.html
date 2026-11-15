@@ -1,0 +1,40 @@
+<div id="shs-design-preview" class="viz-carousel" aria-label="Heating Scheduler desktop and mobile preview">
+  <section data-variant="Desktop" aria-label="Desktop heating scheduler">
+    <smart-heating-scheduler-card id="shs-desktop-preview"></smart-heating-scheduler-card>
+  </section>
+  <section data-variant="Mobile" aria-label="Mobile heating scheduler" hidden>
+    <div style="max-width:390px;margin-inline:auto">
+      <smart-heating-scheduler-card id="shs-mobile-preview"></smart-heating-scheduler-card>
+    </div>
+  </section>
+</div>
+<script>
+/* CARD_BUNDLE */
+const previewRoot = document.getElementById('shs-design-preview');
+const savedPreview = window.openai?.widgetState?.privateContent;
+const previewState = {theme:['auto','dark','light'].includes(savedPreview?.theme)?savedPreview.theme:'dark'};
+function applyPreviewTheme() {
+  for (const [index,card] of [...previewRoot.querySelectorAll('smart-heating-scheduler-card')].entries()) {
+    const view=savedPreview?.views?.[index];
+    card.setConfig({demo:true,theme:previewState.theme,view:['dashboard','schedules','automation','settings'].includes(view)?view:'dashboard'});
+  }
+}
+applyPreviewTheme();
+function rememberPreview() {
+  const cards=[...previewRoot.querySelectorAll('smart-heating-scheduler-card')];
+  window.openai?.setWidgetState?.({
+    modelContent:{preview:'Heating Scheduler Phase 3',zones:cards[0]?._data?.zones.map(zone=>({name:zone.name,source:zone.source,proposed_target:zone.proposed_target}))},
+    privateContent:{theme:previewState.theme,views:cards.map(card=>card._view)}
+  }).catch(()=>{});
+}
+previewRoot.addEventListener('click',()=>queueMicrotask(rememberPreview));
+previewRoot.addEventListener('change',()=>queueMicrotask(rememberPreview));
+window.addEventListener('openai:set_globals',event=>{
+  const state=event.detail?.globals?.widgetState?.privateContent;
+  if(['auto','dark','light'].includes(state?.theme)){previewState.theme=state.theme;applyPreviewTheme();}
+});
+if (globalThis.Tweak) {
+  const tweak = new Tweak({container:previewRoot,onChange:()=>{applyPreviewTheme();rememberPreview();}});
+  tweak.addSelect(previewState,'theme',{label:'Appearance',options:[{label:'Dark',value:'dark'},{label:'Light',value:'light'},{label:'Follow device',value:'auto'}]});
+}
+</script>
