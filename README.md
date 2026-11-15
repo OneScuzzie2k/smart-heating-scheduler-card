@@ -16,6 +16,20 @@ Open preview.html from the development test package. It is disconnected, uses sa
 
 ## Working controls
 
+Mini-card preview: choose **Mini thermostat & boost** in the visual card editor, then select a scheduler and heating zone. The mini layout has the thermostat target and room reading, a manual-target slider, boost-time slider, shared boost start/stop, Resume schedule and an optional link to the full dashboard. It uses the same resource and integration. Test the disconnected example at `/mini` on the local demo server.
+
+```yaml
+type: custom:smart-heating-scheduler-card
+layout: mini
+entry_id: YOUR_CONFIG_ENTRY_ID
+zone_id: YOUR_ZONE_SUBENTRY_ID
+title: Bedroom Heating
+dashboard_path: /your-heating-dashboard
+theme: auto
+```
+
+The mini target slider sends the native thermostat temperature action only when live control is enabled, the zone is available and no boost/holiday handover is active. The backend observes it as a manual target change under the zone's configured hold policy. It never switches on an Off thermostat implicitly. Use Resume schedule explicitly. Boosts use the existing backend API, ownership guards and helper duration constraints. Preview code is under review before replacing any existing Overview cards.
+
 **Occupancy override** is a per-zone setting under Settings (also available on Automation). Enable it, choose an occupied minimum, people or occupancy sensors, active weekdays and hours, then save. It raises a lower scheduled target while occupied; a higher scheduled target is retained. Manual holds, Off, boost and holiday keep their priority. Disabling clears the minimum; occupancy selections, days and hours remain.
 
 Enabled rules appear alongside today's schedule and the phone day editor, with a conditional teal strip under each applicable weekday timeline. The display distinguishes Active, waiting for occupancy, unknown occupancy, outside active hours and another control taking priority. The strip describes the conditional rule; it does not claim someone is home on future days.

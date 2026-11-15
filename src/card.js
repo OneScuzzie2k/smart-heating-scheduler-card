@@ -1,6 +1,7 @@
 import {DAYS, DAY_NAMES, clone, escapeHTML as e, minutes, validateWeek, editPeriod, addPeriod, deletePeriod, copyDay, localParts, periodIndex, demoSnapshot, remainingText} from './model.js';
 import {styles} from './styles.js';
 import {occupancyUI} from './occupancy-ui.js';
+import {miniUI} from './mini-ui.js';
 import {smartUI, defaultSmart, resolveDemo} from './smart-ui.js';
 
 const DOMAIN = 'smart_heating_scheduler';
@@ -21,6 +22,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     });
     this.shadowRoot.addEventListener('change', event => {
       const target = event.target;
+      if(target.hasAttribute('data-mini-target')){void this._miniSetTarget(target.value);return;}
       if(target.dataset.smartField || target.dataset.presenceIndex!==undefined)target.dispatchEvent(new Event('input',{bubbles:true}));
       if(target.dataset.comfortDay){
         this._smartInputs ||= {}; const input=this._smartInputs[this._zone().id] ||= {};
@@ -37,6 +39,8 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     });
     this.shadowRoot.addEventListener('input', event => {
       const target=event.target;
+      if(target.hasAttribute('data-mini-target')){this._miniTarget=target.value;const out=this.shadowRoot.querySelector('[data-mini-reading]');if(out)out.textContent=this._temp(Number(target.value),this._miniZone()?.unit);}
+      if(target.dataset.boost==='minutes'){const out=this.shadowRoot.querySelector('[data-mini-minutes]');if(out)out.textContent=target.value+' minutes';}
       if(target.dataset.boost){this._boostInputs ||= {};const zone=target.closest('[data-smart-zone]').dataset.smartZone;this._boostInputs[zone] ||= {};this._boostInputs[zone][target.dataset.boost]=target.value;}
       if(target.dataset.smartField || target.dataset.presenceIndex!==undefined){this._smartPolicyRevisions ||= {};this._smartPolicyRevisions[this._zone().id] ??= this._zone().smart?.policy_revision;}
       if(target.dataset.smartField){this._smartInputs ||= {};this._smartInputs[this._zone().id] ||= {};this._smartInputs[this._zone().id][target.dataset.smartField]=target.type==='checkbox'?String(target.checked):target.value;}
@@ -52,13 +56,14 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
   }
   static getConfigElement() { return document.createElement('smart-heating-scheduler-card-editor'); }
   static getStubConfig() { return {type:'custom:smart-heating-scheduler-card', title:'Heating Control', theme:'auto'}; }
-  getCardSize() { return this._view === 'schedules' ? 12 : 10; }
-  getGridOptions() { return {columns:12, rows:'auto', min_columns:3}; }
+  getCardSize() { if(this._config?.layout==='mini')return 6; return this._view === 'schedules' ? 12 : 10; }
+  getGridOptions() { if(this._config?.layout==='mini')return {columns:6,rows:'auto',min_columns:3}; return {columns:12, rows:'auto', min_columns:3}; }
   setConfig(config) {
+    if(config.layout && !['full','mini'].includes(config.layout))throw Error('Choose full or mini layout.');
     if (config.theme && !['auto','dark','light'].includes(config.theme)) throw Error('Choose auto, dark or light theme.');
     if (config.view && !VIEWS[config.view]) throw Error('Unknown heating view.');
     const changed = !this._config || config.entry_id !== this._config.entry_id || Boolean(config.demo) !== Boolean(this._config.demo);
-    this._config = {...config, title:config.title || 'Heating Control', theme:config.theme || 'auto'};
+    this._config = {...config, title:config.title || (config.layout==='mini'?'':'Heating Control'), theme:config.theme || 'auto'};
     if (changed) {
       this._stop(); this._data = null; this._draft = null; this._history = []; this._dialog = null;
       this._view = config.view || 'dashboard';
@@ -293,21 +298,22 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     let content = '';
     if (!this._data?.zones?.length) content=`<div class="empty"><div class="empty-icon" aria-hidden="true">♨︎</div><h2>${this._data?'No heating zones available':'Connect your scheduler'}</h2><p>${this._data?'Add zones in the integration, or check your entity permissions.':'Choose the Smart Heating Scheduler entry in the card editor. Existing heating controls are unchanged.'}</p>${this._status==='connecting'?'<span class="badge">Connecting…</span>':''}</div>`;
     else { this._zoneId=this._zone().id; content=this[`_${this._view}`](); }
-    this.shadowRoot.innerHTML=`<style>${styles}</style><div class="wrap"><div class="header"><div class="brand"><span class="brand-icon" aria-hidden="true">♨︎</span><div><h1>${e(this._config.title)}</h1><p>Comfort, on your schedule.</p></div></div><span class="badge"><span class="dot" aria-hidden="true"></span>${this._config.demo?'Design preview':this._data?.observe_only===false?'Heating control':'Observe only'}</span></div><div class="preview-banner"><strong>${this._config.demo?'Sample data':this._data?.observe_only===false?'Heating control enabled':'Heating controls unchanged'}</strong> · ${this._config.demo?'Disconnected from Home Assistant':this._status==='connected'?'Connected to scheduler':this._status==='reconnecting'?'Reconnecting…':'Waiting for scheduler'}</div><nav class="nav" aria-label="Heating views">${Object.entries(VIEWS).map(([key,[icon,name]])=>`<button type="button" data-action="nav" data-view="${key}" aria-current="${key===this._view?'page':'false'}"><span class="nav-icon" aria-hidden="true">${icon}</span>${name}</button>`).join('')}</nav>${this._error?`<div class="error" role="alert">${e(this._error)}</div>`:''}${this._message?`<div class="success" role="status">${e(this._message)}</div>`:''}<main ${this._saving?'aria-busy="true"':''}>${content}</main></div>${this._modal()}`;
+    this.shadowRoot.innerHTML=this._config.layout==='mini'&&this._data?.zones?.length?`<style>${styles}</style>${this._mini()}`:`<style>${styles}</style><div class="wrap"><div class="header"><div class="brand"><span class="brand-icon" aria-hidden="true">♨︎</span><div><h1>${e(this._config.title)}</h1><p>Comfort, on your schedule.</p></div></div><span class="badge"><span class="dot" aria-hidden="true"></span>${this._config.demo?'Design preview':this._data?.observe_only===false?'Heating control':'Observe only'}</span></div><div class="preview-banner"><strong>${this._config.demo?'Sample data':this._data?.observe_only===false?'Heating control enabled':'Heating controls unchanged'}</strong> · ${this._config.demo?'Disconnected from Home Assistant':this._status==='connected'?'Connected to scheduler':this._status==='reconnecting'?'Reconnecting…':'Waiting for scheduler'}</div><nav class="nav" aria-label="Heating views">${Object.entries(VIEWS).map(([key,[icon,name]])=>`<button type="button" data-action="nav" data-view="${key}" aria-current="${key===this._view?'page':'false'}"><span class="nav-icon" aria-hidden="true">${icon}</span>${name}</button>`).join('')}</nav>${this._error?`<div class="error" role="alert">${e(this._error)}</div>`:''}${this._message?`<div class="success" role="status">${e(this._message)}</div>`:''}<main ${this._saving?'aria-busy="true"':''}>${content}</main></div>${this._modal()}`;
     if (this._dialog) { this.shadowRoot.querySelector('.wrap').inert=true; this.shadowRoot.querySelector('.wrap').setAttribute('aria-hidden','true'); }
     if (this._focusDialog) { this._focusDialog=false; queueMicrotask(()=>(this.shadowRoot.querySelector('.modal input:not([readonly])') || this.shadowRoot.querySelector('.modal button'))?.focus()); }
     else if (restoreFocus) { const f=restoreFocus; const element=[...this.shadowRoot.querySelectorAll('button,input,select')].find(el=>el.tagName===f.tag&&el.dataset.action===f.action&&el.dataset.field===f.field&&el.dataset.index===f.index&&el.dataset.day===f.day&&el.dataset.view===f.view&&el.dataset.zone===f.zone&&el.getAttribute('aria-label')===f.aria); element?.focus({preventScroll:true}); }
   }
 }
 
-Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI);
+Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI);
 
 export class SmartHeatingSchedulerCardEditor extends HTMLElement {
-  constructor() { super(); this.attachShadow({mode:'open'}); this._entries=[]; this.shadowRoot.addEventListener('change',event=>{const key=event.target.dataset.config; if(!key)return; this._config={...this._config,[key]:event.target.value}; this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));}); }
-  setConfig(config) { this._config={...config}; this._render(); }
-  set hass(value) { this._hass=value; if(!this._loading){this._loading=true; value.callWS({type:`${DOMAIN}/list`}).then(entries=>{this._entries=entries;this._render();}).catch(()=>{this._failure=true;this._render();});} }
+  constructor() { super(); this.attachShadow({mode:'open'}); this._entries=[]; this.shadowRoot.addEventListener('change',event=>{const key=event.target.dataset.config; if(!key)return; this._config={...this._config,[key]:event.target.value};if(key==='entry_id'){delete this._config.zone_id;this._zoneEntry=null;}this._loadZones();this._render(); this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));}); }
+  setConfig(config) { this._config={...config}; this._loadZones(); this._render(); }
+  _loadZones(){const id=this._config?.entry_id;if(!id||!this._hass||this._zoneEntry===id)return;this._zoneEntry=id;this._zones=[];this._hass.callWS({type:`${DOMAIN}/dashboard`,entry_id:id}).then(data=>{if(this._zoneEntry===id){this._zones=data.zones;this._render();}}).catch(()=>{this._failure=true;this._render();});}
+  set hass(value) { this._hass=value;this._loadZones(); if(!this._loading){this._loading=true; value.callWS({type:`${DOMAIN}/list`}).then(entries=>{this._entries=entries;this._render();}).catch(()=>{this._failure=true;this._render();});} }
   _render() {
-    this.shadowRoot.innerHTML=`<style>${styles}</style><div class="editor"><label>Scheduler<select data-config="entry_id"><option value="">Choose a scheduler</option>${this._entries.map(item=>`<option value="${e(item.entry_id)}" ${this._config?.entry_id===item.entry_id?'selected':''}>${e(item.name)}</option>`).join('')}</select></label><label>Card title<input data-config="title" value="${e(this._config?.title||'Heating Control')}"></label><label>Initial view<select data-config="view">${Object.entries(VIEWS).map(([key,[,name]])=>`<option value="${key}" ${(this._config?.view||'dashboard')===key?'selected':''}>${name}</option>`).join('')}</select></label><label>Theme<select data-config="theme">${['auto','dark','light'].map(theme=>`<option value="${theme}" ${(this._config?.theme||'auto')===theme?'selected':''}>${{auto:'Follow Home Assistant',dark:'Dark',light:'Light'}[theme]}</option>`).join('')}</select></label>${this._failure?'<p role="alert">Could not load schedulers. Check that the integration is available.</p>':''}</div>`;
+    this.shadowRoot.innerHTML=`<style>${styles}</style><div class="editor"><label>Layout<select data-config="layout"><option value="full" ${this._config?.layout!=='mini'?'selected':''}>Full scheduler</option><option value="mini" ${this._config?.layout==='mini'?'selected':''}>Mini thermostat & boost</option></select></label><label>Scheduler<select data-config="entry_id"><option value="">Choose a scheduler</option>${this._entries.map(item=>`<option value="${e(item.entry_id)}" ${this._config?.entry_id===item.entry_id?'selected':''}>${e(item.name)}</option>`).join('')}</select></label>${this._config?.layout==='mini'?`<label>Heating zone<select data-config="zone_id"><option value="">First available zone</option>${(this._zones||[]).map(z=>`<option value="${e(z.id)}" ${this._config.zone_id===z.id?'selected':''}>${e(z.name)}</option>`).join('')}</select></label><label>Full scheduler dashboard path<input data-config="dashboard_path" value="${e(this._config.dashboard_path||'')}" placeholder="/your-heating-dashboard"></label>`:''}<label>Card title<input data-config="title" value="${e(this._config?.title||'Heating Control')}"></label><label>Initial view<select data-config="view">${Object.entries(VIEWS).map(([key,[,name]])=>`<option value="${key}" ${(this._config?.view||'dashboard')===key?'selected':''}>${name}</option>`).join('')}</select></label><label>Theme<select data-config="theme">${['auto','dark','light'].map(theme=>`<option value="${theme}" ${(this._config?.theme||'auto')===theme?'selected':''}>${{auto:'Follow Home Assistant',dark:'Dark',light:'Light'}[theme]}</option>`).join('')}</select></label>${this._failure?'<p role="alert">Could not load schedulers. Check that the integration is available.</p>':''}</div>`;
   }
 }
 if (!customElements.get('smart-heating-scheduler-card')) customElements.define('smart-heating-scheduler-card', SmartHeatingSchedulerCard);

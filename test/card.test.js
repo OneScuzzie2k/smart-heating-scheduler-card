@@ -21,6 +21,24 @@ test('stale saves retain draft and make the conflict actionable',async()=>{const
 const settle=()=>new Promise(r=>setTimeout(r,0));
 function setSmart(h,key,value){const input=h.root.querySelector(`[data-smart-field="${key}"]`);assert.ok(input,key);input.value=value;input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));}
 
+test('mini card isolates the chosen zone, target slider and shared boost controls',async()=>{
+  const h=await setup({demo:true,layout:'mini',zone_id:'lounge',theme:'light'});try{
+    assert.equal(h.root.querySelector('nav'),null);assert.match(h.root.querySelector('h2').textContent,/Lounge/);assert.equal(h.card.getGridOptions().columns,6);
+    const target=h.root.querySelector('[data-mini-target]');target.value='22';target.dispatchEvent(new h.dom.window.Event('change',{bubbles:true}));await settle();assert.equal(h.card._data.zones[1].device_target,22);assert.equal(h.card._data.zones[0].device_target,20);
+    click(h.root,'smart-boost-start','[data-zone="lounge"]');await settle();assert.ok(h.card._data.zones[1].smart.boost);assert.equal(h.card._data.zones[0].smart.boost,null);click(h.root,'smart-boost-cancel','[data-zone="lounge"]');await settle();assert.equal(h.card._data.zones[1].smart.boost,null);
+  }finally{h.close();}
+});
+
+test('mini manual target uses only the mapped climate and respects control/availability/limits',async()=>{
+  const h=await setup({demo:true,layout:'mini',zone_id:'lounge'});try{
+    const calls=[];h.card._config.demo=false;h.card._status='connected';h.card._data.observe_only=false;const z=h.card._miniZone();z.climate_entity='climate.test_lounge';h.card._hass={callService:async(...args)=>calls.push(args)};
+    await h.card._miniSetTarget(21);assert.equal(calls.length,1);assert.equal(calls[0][0],'climate');assert.equal(calls[0][1],'set_temperature');assert.equal(calls[0][2].temperature,21);assert.equal(calls[0][3].entity_id,'climate.test_lounge');
+    await h.card._miniSetTarget(99);assert.equal(calls.length,1);await h.card._miniSetTarget(21.1);assert.equal(calls.length,1);
+    h.card._data.observe_only=true;await h.card._miniSetTarget(22);h.card._data.observe_only=false;z.boost.active=true;await h.card._miniSetTarget(22);z.boost.active=false;z.mode='unavailable';await h.card._miniSetTarget(22);assert.equal(calls.length,1);
+    h.card._config.zone_id='missing';h.card._render();assert.match(h.root.textContent,/zone unavailable/);assert.equal(h.root.querySelector('[data-mini-target]'),null);
+  }finally{h.close();}
+});
+
 test('occupancy override is a zone setting and conditionally appears alongside schedules',async()=>{
   const h=await setup();try{
     const z=h.card._zone();Object.assign(z.smart.policy,{entities:[{entity_id:'person.worker',home_state:'home',away_state:'not_home'}],comfort_target:20,comfort_days:['mon','tue','wed','thu','fri']});

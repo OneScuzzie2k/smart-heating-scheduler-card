@@ -135,6 +135,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
 
 .occupancy-settings{grid-column:1/-1}.occupancy-toggle{display:flex;align-items:center;gap:12px;margin-bottom:18px;font-weight:600;color:var(--shs-ink)}.occupancy-toggle input{width:22px;height:22px;accent-color:var(--shs-teal)}.occupancy-days{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0}.occupancy-days legend{margin-bottom:9px;font-size:12px;color:var(--shs-muted)}.occupancy-days label{display:flex;align-items:center;gap:6px;border:1px solid var(--shs-line);border-radius:10px;padding:9px;min-height:44px}.occupancy-days input{width:18px;height:18px;accent-color:var(--shs-teal)}.occupancy-advanced{margin:18px 0}.occupancy-advanced summary{cursor:pointer;min-height:44px;padding:12px 0;color:var(--shs-teal)}.occupancy-summary{background:color-mix(in srgb,var(--shs-teal) 7%,var(--shs-panel));border:1px solid color-mix(in srgb,var(--shs-teal) 35%,var(--shs-line));border-radius:14px;padding:14px;margin:14px 0}.occupancy-summary-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.occupancy-summary.active{border-color:var(--shs-teal)}.occupancy-summary p{margin:8px 0;font-size:12px;color:var(--shs-muted)}.occupancy-summary .badge{flex:none}.occupancy-track{height:9px;background:var(--shs-panel2);border-radius:6px;margin-top:7px;overflow:hidden}.occupancy-track span{display:block;height:100%;border-radius:6px;border:1px dashed var(--shs-teal);background:color-mix(in srgb,var(--shs-teal) 35%,transparent)}
 @container(max-width:650px){.occupancy-summary-head{align-items:flex-start;flex-direction:column}.occupancy-days label{flex:1 0 20%;justify-content:center}}
+
+.mini{padding:16px;background:var(--shs-panel);border:1px solid var(--shs-line);border-radius:18px}.mini .section-head{margin-bottom:4px}.mini h2{font-size:17px}:host([theme=light]){color-scheme:light}.mini-mode{color:var(--shs-muted);font-size:11px;margin-bottom:12px}.mini .ring{max-width:165px;margin-bottom:8px}.mini .reading{font-size:32px}.mini-slider{display:block;margin:8px 0;color:var(--shs-muted);font-size:12px}.mini-slider input[type=range]{display:block;width:100%;min-height:28px;padding:0;border:0;accent-color:var(--shs-orange-fill);background:transparent}.mini-slider output{float:right;color:var(--shs-ink)}.mini-boost{margin-top:15px;border-top:1px solid var(--shs-line)}.mini-occupancy{color:var(--shs-teal);font-size:11px;margin:12px 0}.mini .toolbar{justify-content:space-between;margin-top:12px}.mini .toolbar button,.mini .toolbar a{font-size:11px}.mini .boost-controls button{font-size:12px}
+
+.mini-slider input[type=range]{appearance:none;-webkit-appearance:none;cursor:pointer}.mini-slider input[type=range]::-webkit-slider-runnable-track{height:8px;background:var(--shs-track);border-radius:6px}.mini-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--shs-orange-fill);margin-top:-6px;box-shadow:0 1px 3px #0003}.mini-slider input[type=range]::-moz-range-track{height:8px;background:var(--shs-track);border-radius:6px}.mini-slider input[type=range]::-moz-range-thumb{width:16px;height:16px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--shs-orange-fill)}
 `;
 
   // src/occupancy-ui.js
@@ -188,6 +192,65 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       if (!p || p.comfort_target === null || !p.comfort_days.includes(day)) return "";
       const start = minutes(p.comfort_start) / 1440 * 100, width = (minutes(p.comfort_end) - minutes(p.comfort_start)) / 1440 * 100;
       return `<div class="occupancy-track" aria-label="${escapeHTML(DAY_NAMES[DAYS.indexOf(day)])} occupancy override ${escapeHTML(p.comfort_start)} to ${escapeHTML(p.comfort_end)}, minimum ${escapeHTML(this._temp(p.comfort_target, z.unit))} only when occupied"><span style="margin-left:${start}%;width:${width}%" title="Occupancy override \xB7 ${escapeHTML(this._temp(p.comfort_target, z.unit))}"></span></div>`;
+    }
+  };
+
+  // src/mini-ui.js
+  var miniUI = {
+    _miniZone() {
+      return this._config.zone_id ? this._data?.zones.find((z) => z.id === this._config.zone_id) : this._zone();
+    },
+    _miniCanSet(z) {
+      return !!(z && this._canEdit() && !this._saving && (this._config.demo || !this._data.observe_only) && z.enabled && z.mode === "heat" && !z.boost.active && !z.smart?.external_operation && !["holiday", "unavailable", "unsupported", "error", "disabled", "boost_unknown", "boost_handover"].includes(z.source) && !z.error);
+    },
+    async _miniSetTarget(raw) {
+      const z = this._miniZone();
+      if (!this._miniCanSet(z)) return;
+      const value = Number(raw), step = z.limits.step;
+      if (!Number.isFinite(value) || value < z.limits.minimum || value > z.limits.maximum || step && Math.abs(value / step - Math.round(value / step)) > 1e-6) {
+        this._error = "Choose a target within this zone\u2019s reviewed limits.";
+        this._render();
+        return;
+      }
+      this._saving = true;
+      this._error = "";
+      this._render();
+      try {
+        if (this._config.demo) {
+          z.device_target = value;
+          z.proposed_target = value;
+          z.source = "manual";
+        } else await this._hass.callService("climate", "set_temperature", { temperature: value }, { entity_id: z.climate_entity });
+        this._message = "Manual target sent";
+      } catch (error) {
+        this._error = error.message || "Could not set the thermostat target.";
+      } finally {
+        this._saving = false;
+        this._miniTarget = null;
+        this._render();
+      }
+    },
+    _mini() {
+      const z = this._miniZone();
+      if (!z) return `<div class="wrap mini"><h2>Heating zone unavailable</h2><p>Choose a valid zone in the card editor.</p></div>`;
+      const p = z.smart?.policy, helper = this._hass?.states?.[p?.duration_helper]?.attributes;
+      const max = Math.min(p?.boost_max_minutes || 120, helper?.max || 1440), min = Math.max(1, helper?.min || 1), durationStep = helper?.step || 1;
+      const duration = this._boostInputs?.[z.id]?.minutes ?? p?.boost_minutes ?? 30;
+      const target = this._miniTarget ?? z.device_target ?? z.limits.minimum;
+      const fill = Math.max(0, Math.min(270, (Number(target) - z.limits.minimum) / (z.limits.maximum - z.limits.minimum) * 270));
+      const canSet = this._miniCanSet(z), disabled = !this._canEdit() || this._saving;
+      const boostDisabled = disabled || !(z.boost.active ? z.boost.can_cancel : z.boost.can_start);
+      const caption = z.mode === "off" ? "Off" : z.hvac_action === "heating" ? "Heating" : z.hvac_action === "idle" ? "Idle" : "Activity unknown";
+      const href = this._config.dashboard_path?.startsWith("/") && !this._config.dashboard_path.startsWith("//") ? this._config.dashboard_path : null;
+      return `<section class="wrap mini ${z.hvac_action === "heating" ? "" : "idle"}" aria-label="${escapeHTML(z.name)} mini thermostat"><div class="section-head"><h2>${escapeHTML(this._config.title || z.name)}</h2><button type="button" class="link-button" data-action="more" data-zone="${escapeHTML(z.id)}" aria-label="Open native thermostat" ${z.climate_entity ? "" : "disabled"}>\u2197</button></div>
+      <div class="mini-mode">${this._config.demo ? "Sample data" : this._data.observe_only ? "Observe only" : "Heating control"} \xB7 ${escapeHTML(caption)}</div>
+      <div class="ring" style="--fill:${fill}"><small>Target temperature</small><div class="reading" data-mini-reading>${escapeHTML(this._temp(Number(target), z.unit))}</div><small>Room ${escapeHTML(this._temp(z.current_temperature, z.unit))}</small></div>
+      <label class="mini-slider">Target temperature<input type="range" data-mini-target aria-label="Target temperature" min="${z.limits.minimum}" max="${z.limits.maximum}" step="${z.limits.step || (z.unit === "\xB0F" ? 1 : 0.5)}" value="${escapeHTML(target)}" ${canSet ? "" : "disabled"}></label>
+      <small>${z.source === "manual" ? "Manual override" : z.mode === "off" ? "Resume schedule to turn heating on" : this._config.demo ? "Preview manual target \xB7 no heating commands" : this._data.observe_only ? "Thermostat changes disabled in observe-only mode" : "Changes use this zone\u2019s manual hold policy"}</small>
+      <div class="mini-boost" data-smart-zone="${escapeHTML(z.id)}"><input type="hidden" data-boost="target" value="${escapeHTML(p?.boost_target ?? "")}"><label class="mini-slider">Boost time <output data-mini-minutes>${escapeHTML(duration)} minutes</output><input type="range" data-boost="minutes" aria-label="Boost duration" min="${min}" max="${max}" step="${durationStep}" value="${escapeHTML(duration)}" ${disabled || p?.boost_owner === "external" && !p.duration_helper ? "disabled" : ""}></label><div class="boost-controls"><small>${z.boost.active ? escapeHTML(remainingText(z.boost.until, this._now())) : p?.boost_target !== null ? "Boost to " + escapeHTML(this._temp(p?.boost_target, z.unit)) : "Boost not configured"}</small><button type="button" class="primary" data-action="smart-${z.boost.active ? "boost-cancel" : "boost-start"}" data-zone="${escapeHTML(z.id)}" ${boostDisabled ? "disabled" : ""}>${z.boost.active ? "Stop boost" : "Start boost"}</button></div></div>
+      ${p?.comfort_target !== null && p?.comfort_target !== void 0 ? `<p class="mini-occupancy">Occupancy override \xB7 ${escapeHTML(this._temp(p.comfort_target, z.unit))} minimum${z.source === "occupied_comfort" ? " \xB7 Active" : ""}</p>` : ""}
+      <div class="toolbar"><button type="button" class="link-button" data-action="smart-resume" data-zone="${escapeHTML(z.id)}" ${disabled || !this._config.demo && this._data.observe_only ? "disabled" : ""}>Resume schedule</button>${href ? `<a class="shs-link" href="${escapeHTML(href)}">Full scheduler \u2192</a>` : ""}</div>
+      ${this._error ? `<p class="error" role="alert">${escapeHTML(this._error)}</p>` : ""}${this._message ? `<small role="status">${escapeHTML(this._message)}</small>` : ""}</section>${this._modal()}`;
     }
   };
 
@@ -465,6 +528,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       });
       this.shadowRoot.addEventListener("change", (event) => {
         const target = event.target;
+        if (target.hasAttribute("data-mini-target")) {
+          void this._miniSetTarget(target.value);
+          return;
+        }
         if (target.dataset.smartField || target.dataset.presenceIndex !== void 0) target.dispatchEvent(new Event("input", { bubbles: true }));
         if (target.dataset.comfortDay) {
           this._smartInputs ||= {};
@@ -486,6 +553,15 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       });
       this.shadowRoot.addEventListener("input", (event) => {
         const target = event.target;
+        if (target.hasAttribute("data-mini-target")) {
+          this._miniTarget = target.value;
+          const out = this.shadowRoot.querySelector("[data-mini-reading]");
+          if (out) out.textContent = this._temp(Number(target.value), this._miniZone()?.unit);
+        }
+        if (target.dataset.boost === "minutes") {
+          const out = this.shadowRoot.querySelector("[data-mini-minutes]");
+          if (out) out.textContent = target.value + " minutes";
+        }
         if (target.dataset.boost) {
           this._boostInputs ||= {};
           const zone = target.closest("[data-smart-zone]").dataset.smartZone;
@@ -535,16 +611,19 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       return { type: "custom:smart-heating-scheduler-card", title: "Heating Control", theme: "auto" };
     }
     getCardSize() {
+      if (this._config?.layout === "mini") return 6;
       return this._view === "schedules" ? 12 : 10;
     }
     getGridOptions() {
+      if (this._config?.layout === "mini") return { columns: 6, rows: "auto", min_columns: 3 };
       return { columns: 12, rows: "auto", min_columns: 3 };
     }
     setConfig(config) {
+      if (config.layout && !["full", "mini"].includes(config.layout)) throw Error("Choose full or mini layout.");
       if (config.theme && !["auto", "dark", "light"].includes(config.theme)) throw Error("Choose auto, dark or light theme.");
       if (config.view && !VIEWS[config.view]) throw Error("Unknown heating view.");
       const changed = !this._config || config.entry_id !== this._config.entry_id || Boolean(config.demo) !== Boolean(this._config.demo);
-      this._config = { ...config, title: config.title || "Heating Control", theme: config.theme || "auto" };
+      this._config = { ...config, title: config.title || (config.layout === "mini" ? "" : "Heating Control"), theme: config.theme || "auto" };
       if (changed) {
         this._stop();
         this._data = null;
@@ -985,7 +1064,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
         this._zoneId = this._zone().id;
         content = this[`_${this._view}`]();
       }
-      this.shadowRoot.innerHTML = `<style>${styles}</style><div class="wrap"><div class="header"><div class="brand"><span class="brand-icon" aria-hidden="true">\u2668\uFE0E</span><div><h1>${escapeHTML(this._config.title)}</h1><p>Comfort, on your schedule.</p></div></div><span class="badge"><span class="dot" aria-hidden="true"></span>${this._config.demo ? "Design preview" : this._data?.observe_only === false ? "Heating control" : "Observe only"}</span></div><div class="preview-banner"><strong>${this._config.demo ? "Sample data" : this._data?.observe_only === false ? "Heating control enabled" : "Heating controls unchanged"}</strong> \xB7 ${this._config.demo ? "Disconnected from Home Assistant" : this._status === "connected" ? "Connected to scheduler" : this._status === "reconnecting" ? "Reconnecting\u2026" : "Waiting for scheduler"}</div><nav class="nav" aria-label="Heating views">${Object.entries(VIEWS).map(([key, [icon, name]]) => `<button type="button" data-action="nav" data-view="${key}" aria-current="${key === this._view ? "page" : "false"}"><span class="nav-icon" aria-hidden="true">${icon}</span>${name}</button>`).join("")}</nav>${this._error ? `<div class="error" role="alert">${escapeHTML(this._error)}</div>` : ""}${this._message ? `<div class="success" role="status">${escapeHTML(this._message)}</div>` : ""}<main ${this._saving ? 'aria-busy="true"' : ""}>${content}</main></div>${this._modal()}`;
+      this.shadowRoot.innerHTML = this._config.layout === "mini" && this._data?.zones?.length ? `<style>${styles}</style>${this._mini()}` : `<style>${styles}</style><div class="wrap"><div class="header"><div class="brand"><span class="brand-icon" aria-hidden="true">\u2668\uFE0E</span><div><h1>${escapeHTML(this._config.title)}</h1><p>Comfort, on your schedule.</p></div></div><span class="badge"><span class="dot" aria-hidden="true"></span>${this._config.demo ? "Design preview" : this._data?.observe_only === false ? "Heating control" : "Observe only"}</span></div><div class="preview-banner"><strong>${this._config.demo ? "Sample data" : this._data?.observe_only === false ? "Heating control enabled" : "Heating controls unchanged"}</strong> \xB7 ${this._config.demo ? "Disconnected from Home Assistant" : this._status === "connected" ? "Connected to scheduler" : this._status === "reconnecting" ? "Reconnecting\u2026" : "Waiting for scheduler"}</div><nav class="nav" aria-label="Heating views">${Object.entries(VIEWS).map(([key, [icon, name]]) => `<button type="button" data-action="nav" data-view="${key}" aria-current="${key === this._view ? "page" : "false"}"><span class="nav-icon" aria-hidden="true">${icon}</span>${name}</button>`).join("")}</nav>${this._error ? `<div class="error" role="alert">${escapeHTML(this._error)}</div>` : ""}${this._message ? `<div class="success" role="status">${escapeHTML(this._message)}</div>` : ""}<main ${this._saving ? 'aria-busy="true"' : ""}>${content}</main></div>${this._modal()}`;
       if (this._dialog) {
         this.shadowRoot.querySelector(".wrap").inert = true;
         this.shadowRoot.querySelector(".wrap").setAttribute("aria-hidden", "true");
@@ -1000,7 +1079,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
     }
   };
-  Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI);
+  Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI);
   var SmartHeatingSchedulerCardEditor = class extends HTMLElement {
     constructor() {
       super();
@@ -1010,15 +1089,38 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
         const key = event.target.dataset.config;
         if (!key) return;
         this._config = { ...this._config, [key]: event.target.value };
+        if (key === "entry_id") {
+          delete this._config.zone_id;
+          this._zoneEntry = null;
+        }
+        this._loadZones();
+        this._render();
         this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
       });
     }
     setConfig(config) {
       this._config = { ...config };
+      this._loadZones();
       this._render();
+    }
+    _loadZones() {
+      const id = this._config?.entry_id;
+      if (!id || !this._hass || this._zoneEntry === id) return;
+      this._zoneEntry = id;
+      this._zones = [];
+      this._hass.callWS({ type: `${DOMAIN}/dashboard`, entry_id: id }).then((data) => {
+        if (this._zoneEntry === id) {
+          this._zones = data.zones;
+          this._render();
+        }
+      }).catch(() => {
+        this._failure = true;
+        this._render();
+      });
     }
     set hass(value) {
       this._hass = value;
+      this._loadZones();
       if (!this._loading) {
         this._loading = true;
         value.callWS({ type: `${DOMAIN}/list` }).then((entries) => {
@@ -1031,7 +1133,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
     }
     _render() {
-      this.shadowRoot.innerHTML = `<style>${styles}</style><div class="editor"><label>Scheduler<select data-config="entry_id"><option value="">Choose a scheduler</option>${this._entries.map((item) => `<option value="${escapeHTML(item.entry_id)}" ${this._config?.entry_id === item.entry_id ? "selected" : ""}>${escapeHTML(item.name)}</option>`).join("")}</select></label><label>Card title<input data-config="title" value="${escapeHTML(this._config?.title || "Heating Control")}"></label><label>Initial view<select data-config="view">${Object.entries(VIEWS).map(([key, [, name]]) => `<option value="${key}" ${(this._config?.view || "dashboard") === key ? "selected" : ""}>${name}</option>`).join("")}</select></label><label>Theme<select data-config="theme">${["auto", "dark", "light"].map((theme) => `<option value="${theme}" ${(this._config?.theme || "auto") === theme ? "selected" : ""}>${{ auto: "Follow Home Assistant", dark: "Dark", light: "Light" }[theme]}</option>`).join("")}</select></label>${this._failure ? '<p role="alert">Could not load schedulers. Check that the integration is available.</p>' : ""}</div>`;
+      this.shadowRoot.innerHTML = `<style>${styles}</style><div class="editor"><label>Layout<select data-config="layout"><option value="full" ${this._config?.layout !== "mini" ? "selected" : ""}>Full scheduler</option><option value="mini" ${this._config?.layout === "mini" ? "selected" : ""}>Mini thermostat & boost</option></select></label><label>Scheduler<select data-config="entry_id"><option value="">Choose a scheduler</option>${this._entries.map((item) => `<option value="${escapeHTML(item.entry_id)}" ${this._config?.entry_id === item.entry_id ? "selected" : ""}>${escapeHTML(item.name)}</option>`).join("")}</select></label>${this._config?.layout === "mini" ? `<label>Heating zone<select data-config="zone_id"><option value="">First available zone</option>${(this._zones || []).map((z) => `<option value="${escapeHTML(z.id)}" ${this._config.zone_id === z.id ? "selected" : ""}>${escapeHTML(z.name)}</option>`).join("")}</select></label><label>Full scheduler dashboard path<input data-config="dashboard_path" value="${escapeHTML(this._config.dashboard_path || "")}" placeholder="/your-heating-dashboard"></label>` : ""}<label>Card title<input data-config="title" value="${escapeHTML(this._config?.title || "Heating Control")}"></label><label>Initial view<select data-config="view">${Object.entries(VIEWS).map(([key, [, name]]) => `<option value="${key}" ${(this._config?.view || "dashboard") === key ? "selected" : ""}>${name}</option>`).join("")}</select></label><label>Theme<select data-config="theme">${["auto", "dark", "light"].map((theme) => `<option value="${theme}" ${(this._config?.theme || "auto") === theme ? "selected" : ""}>${{ auto: "Follow Home Assistant", dark: "Dark", light: "Light" }[theme]}</option>`).join("")}</select></label>${this._failure ? '<p role="alert">Could not load schedulers. Check that the integration is available.</p>' : ""}</div>`;
     }
   };
   if (!customElements.get("smart-heating-scheduler-card")) customElements.define("smart-heating-scheduler-card", SmartHeatingSchedulerCard);

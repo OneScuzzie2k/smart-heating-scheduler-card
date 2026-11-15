@@ -1,3 +1,10 @@
+# 0.3.0-dev.3 - mini-card preview
+
+- Add an optional one-zone mini thermostat/boost layout with manual target and boost-duration sliders, native thermostat details, Resume schedule and dashboard link.
+- Add layout and zone selection to the visual editor and a disconnected `/mini` design preview.
+- Manual targets respect observed live mode, reviewed bounds, availability and boost/holiday guards. No backend change required.
+- Validation: 27 frontend tests, including mini zone isolation and guarded mapped-climate calls.
+
 # 0.3.0-dev.2
 
 - Rename the occupied comfort feature to Occupancy override and expose it as a per-zone setting with an enable switch, minimum temperature, day buttons, hours and explicit people/sensor selection.
