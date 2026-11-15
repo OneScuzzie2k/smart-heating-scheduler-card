@@ -16,6 +16,10 @@ Open preview.html from the development test package. It is disconnected, uses sa
 
 ## Working controls
 
+**Occupancy override** is a per-zone setting under Settings (also available on Automation). Enable it, choose an occupied minimum, people or occupancy sensors, active weekdays and hours, then save. It raises a lower scheduled target while occupied; a higher scheduled target is retained. Manual holds, Off, boost and holiday keep their priority. Disabling clears the minimum; occupancy selections, days and hours remain.
+
+Enabled rules appear alongside today's schedule and the phone day editor, with a conditional teal strip under each applicable weekday timeline. The display distinguishes Active, waiting for occupancy, unknown occupancy, outside active hours and another control taking priority. The strip describes the conditional rule; it does not claim someone is home on future days.
+
 - Dashboard measurements/device targets/proposals stay distinct, with control-source explanations and boost countdowns.
 - Weekly schedule editor: desktop timelines, phone day/period list, explicit time/target/label editor, split/delete, day/week copy, undo, save/cancel and revision conflicts.
 - Boost target/duration/start/cancel with backend capability checks and acknowledged holiday exceptions.

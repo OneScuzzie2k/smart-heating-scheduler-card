@@ -21,6 +21,30 @@ test('stale saves retain draft and make the conflict actionable',async()=>{const
 const settle=()=>new Promise(r=>setTimeout(r,0));
 function setSmart(h,key,value){const input=h.root.querySelector(`[data-smart-field="${key}"]`);assert.ok(input,key);input.value=value;input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));}
 
+test('occupancy override is a zone setting and conditionally appears alongside schedules',async()=>{
+  const h=await setup();try{
+    const z=h.card._zone();Object.assign(z.smart.policy,{entities:[{entity_id:'person.worker',home_state:'home',away_state:'not_home'}],comfort_target:20,comfort_days:['mon','tue','wed','thu','fri']});
+    h.card._hass={states:{'person.worker':{attributes:{friendly_name:'Worker <script>unsafe</script>'}}}};
+    h.card._render();assert.match(h.root.querySelector('.occupancy-summary').textContent,/Minimum 20.0°C when occupied/);assert.equal(h.root.querySelector('.occupancy-summary script'),null);
+    click(h.root,'nav','[data-view="schedules"]');assert.equal(h.root.querySelectorAll('.week-row .occupancy-track').length,5);assert.ok(h.root.querySelector('.period-list').previousElementSibling.classList.contains('occupancy-summary'));
+    click(h.root,'occupancy-settings');assert.equal(h.card._view,'settings');assert.match(h.root.querySelector('.occupancy-settings').textContent,/Keep this zone at a minimum temperature/);assert.equal(h.root.querySelector('[role="switch"]').checked,true);
+    const toggle=h.root.querySelector('[role="switch"]');toggle.checked=false;toggle.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));click(h.root,'smart-save-presence');await settle();assert.equal(z.smart.policy.comfort_target,null);assert.equal(h.card._data.zones[1].smart.policy.comfort_target,null);
+    click(h.root,'nav','[data-view="schedules"]');assert.equal(h.root.querySelector('.occupancy-summary'),null);
+  }finally{h.close();}
+});
+
+test('occupancy override needs inputs and days, and saved day selections survive snapshots',async()=>{
+  const h=await setup();try{
+    click(h.root,'nav','[data-view="settings"]');
+    let toggle=h.root.querySelector('[role="switch"]');toggle.checked=true;toggle.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));setSmart(h,'comfort_target','20');
+    click(h.root,'smart-save-presence');await settle();assert.match(h.root.textContent,/Choose at least one person/);assert.equal(h.card._zone().smart.policy.comfort_target,null);
+    h.card._zone().smart.policy.entities=[{entity_id:'person.worker',home_state:'home',away_state:'not_home'}];h.card._render();
+    const day=h.root.querySelector('[data-comfort-day="fri"]');day.checked=false;day.dispatchEvent(new h.dom.window.Event('change',{bubbles:true}));
+    h.card._receive(structuredClone(h.card._data));assert.equal(h.root.querySelector('[data-comfort-day="fri"]').checked,false);assert.equal(h.root.querySelector('[role="switch"]').checked,true);
+    click(h.root,'smart-save-presence');await settle();assert.equal(h.card._zone().smart.policy.comfort_target,20);assert.deepEqual([...h.card._zone().smart.policy.comfort_days],['mon','tue','wed','thu']);
+  }finally{h.close();}
+});
+
 test('boost start and cancel update only the selected demo zone',async()=>{const h=await setup();try{const box=h.root.querySelector('[data-smart-zone="bedroom"]');box.querySelector('[data-boost="target"]').value='22';click(h.root,'smart-boost-start','[data-zone="bedroom"]');await settle();assert.equal(h.card._data.zones[0].proposed_target,22);assert.equal(h.card._data.zones[0].source,'boost');assert.equal(h.card._data.zones[1].source,'schedule');click(h.root,'smart-boost-cancel','[data-zone="bedroom"]');await settle();assert.equal(h.card._data.zones[0].source,'schedule');assert.equal(h.card._data.zones[0].smart.boost,null);}finally{h.close();}});
 
 test('demo boost expires at its original deadline when clock advances',async()=>{const h=await setup();try{click(h.root,'smart-boost-start','[data-zone="bedroom"]');await settle();const until=h.card._zone().smart.boost.until;assert.ok(until);click(h.root,'nav','[data-view="automation"]');click(h.root,'smart-advance');await settle();assert.equal(h.card._zone().smart.boost,null);assert.equal(h.card._zone().proposed_target,16);}finally{h.close();}});

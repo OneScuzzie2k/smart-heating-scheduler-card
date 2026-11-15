@@ -1,3 +1,11 @@
+# 0.3.0-dev.2
+
+- Rename the occupied comfort feature to Occupancy override and expose it as a per-zone setting with an enable switch, minimum temperature, day buttons, hours and explicit people/sensor selection.
+- Show enabled rules with current status alongside the dashboard/day schedule and conditional bands under applicable weekly timelines.
+- Preserve policy revisions and unsaved occupancy selections across snapshots; reject enabled rules without occupancy inputs or active days.
+- Correct the temperature explanation when live heating control is enabled.
+- Validation: 25 frontend tests passed. Backend API/storage contract unchanged; compatible with backend 0.3.0.dev2.
+
 # 0.3.0-dev.1 - Phase 3 development candidate
 
 Added working per-zone boost, presence and holiday controls; persistent deadlines/ownership, guarded optional climate commands, adapter completion signals, policy revisions and admin-only mutations. Default remains observe-only. Updated responsive card and disconnected demo. Full installation/hardware validation and release work remain.

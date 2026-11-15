@@ -1,10 +1,11 @@
 import {DAYS, DAY_NAMES, clone, escapeHTML as e, minutes, validateWeek, editPeriod, addPeriod, deletePeriod, copyDay, localParts, periodIndex, demoSnapshot, remainingText} from './model.js';
 import {styles} from './styles.js';
+import {occupancyUI} from './occupancy-ui.js';
 import {smartUI, defaultSmart, resolveDemo} from './smart-ui.js';
 
 const DOMAIN = 'smart_heating_scheduler';
 const VIEWS = {dashboard:['⌂','Dashboard'], schedules:['▦','Schedules'], automation:['◷','Automation'], settings:['⚙','Settings']};
-const SOURCES = {boost:'Timed boost', holiday:'Holiday', away:'Away target', occupied_comfort:'Occupied comfort', boost_handover:'Boost handover needs review', schedule:'Following schedule', manual:'Manual override', manual_off:'Manual off', off:'Thermostat off', external_boost:'External boost', boost_unknown:'Boost status unknown', unavailable:'Thermostat unavailable', unsupported:'Review thermostat capabilities', disabled:'Scheduler disabled', error:'Review required'};
+const SOURCES = {boost:'Timed boost', holiday:'Holiday', away:'Away target', occupied_comfort:'Occupancy override', boost_handover:'Boost handover needs review', schedule:'Following schedule', manual:'Manual override', manual_off:'Manual off', off:'Thermostat off', external_boost:'External boost', boost_unknown:'Boost status unknown', unavailable:'Thermostat unavailable', unsupported:'Review thermostat capabilities', disabled:'Scheduler disabled', error:'Review required'};
 const button = (label, action, attrs = '', cls = '') => `<button type="button" data-action="${action}" class="${cls}" ${attrs}>${e(label)}</button>`;
 
 export class SmartHeatingSchedulerCard extends HTMLElement {
@@ -21,6 +22,13 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     this.shadowRoot.addEventListener('change', event => {
       const target = event.target;
       if(target.dataset.smartField || target.dataset.presenceIndex!==undefined)target.dispatchEvent(new Event('input',{bubbles:true}));
+      if(target.dataset.comfortDay){
+        this._smartInputs ||= {}; const input=this._smartInputs[this._zone().id] ||= {};
+        this._smartPolicyRevisions ||= {}; this._smartPolicyRevisions[this._zone().id] ??= this._zone().smart.policy_revision;
+        const selected=new Set((input.comfort_days??this._zone().smart.policy.comfort_days.join(',')).split(','));
+        target.checked?selected.add(target.dataset.comfortDay):selected.delete(target.dataset.comfortDay);
+        input.comfort_days=DAYS.filter(day=>selected.has(day)).join(',');
+      }
       if (target.dataset.action === 'zone-select') this._guard(() => this._selectZone(target.value));
       if (target.dataset.action === 'theme-select') { this._config.theme = target.value; this._render(); }
       if (target.dataset.copyDay) {
@@ -31,7 +39,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
       const target=event.target;
       if(target.dataset.boost){this._boostInputs ||= {};const zone=target.closest('[data-smart-zone]').dataset.smartZone;this._boostInputs[zone] ||= {};this._boostInputs[zone][target.dataset.boost]=target.value;}
       if(target.dataset.smartField || target.dataset.presenceIndex!==undefined){this._smartPolicyRevisions ||= {};this._smartPolicyRevisions[this._zone().id] ??= this._zone().smart?.policy_revision;}
-      if(target.dataset.smartField){this._smartInputs ||= {};this._smartInputs[this._zone().id] ||= {};this._smartInputs[this._zone().id][target.dataset.smartField]=target.value;}
+      if(target.dataset.smartField){this._smartInputs ||= {};this._smartInputs[this._zone().id] ||= {};this._smartInputs[this._zone().id][target.dataset.smartField]=target.type==='checkbox'?String(target.checked):target.value;}
       if(target.dataset.presenceIndex!==undefined){this._smartInputs ||= {};const input=this._smartInputs[this._zone().id] ||= {};input.entities ||= clone(this._zone().smart.policy.entities);input.entities[Number(target.dataset.presenceIndex)][target.dataset.presenceKey]=target.value;}
       if (this._dialog?.kind === 'period' && event.target.dataset.field) this._dialog.edit[event.target.dataset.field] = event.target.value;
     });
@@ -165,6 +173,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     } finally { this._saving = false; this._render(); }
   }
   _action(action, data = {}) {
+    if(action==='occupancy-settings'){this._guard(()=>{this._selectZone(data.zone);this._view='settings';this._render();});return;}
     if(action.startsWith('smart-')){void this._smartAction(action.slice(6),data);return;}
     if(action==='close'){this._holidayAcknowledged=false;this._pendingBoost=null;}
     if(action==='holiday-boost-confirm'){this._holidayAcknowledged=true;const zone=this._dialog.zone;this._dialog=null;void this._smartAction('boost-start',{zone});return;}
@@ -223,9 +232,9 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     return `<div class="summary"><div><span>HEATING ZONES</span><b>${this._data.zones.length} configured</b></div><div><span>HOLIDAY</span><b>${this._data.zones.some(z=>z.smart?.holiday)?'Planned':'Inactive'}</b></div><div><span>SCHEDULER</span><b>${this._data.observe_only?'Observe only':'Controlling'}</b></div></div>
       <div class="zones">${this._data.zones.map(z => this._zoneCard(z)).join('')}</div>
       <section class="panel"><div class="section-head"><div><div class="eyebrow">${e(DAY_NAMES[DAYS.indexOf(local.day)])} · ${e(local.time)}</div><h2>Today’s schedule</h2></div>${this._selector()}</div>
-      <div class="timeline-wrap">${this._timeline(zone.week[local.day], local.day,true)}<div class="time-marker" style="left:${local.minute/1440*100}%"><span style="transform:translateX(${local.minute<60?0:local.minute>1380?-100:-50}%)">${e(local.time)}</span></div></div><div class="ticks"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div><div class="legend"><span><i></i>Comfort target</span><span><i class="cool"></i>Setback target</span></div>${button('Edit today’s periods →','schedule',`data-zone="${e(zone.id)}"`,'link-button')}</section>
-      <div class="bottom-grid"><section class="panel"><div class="scope">Selected zone</div><h2>Presence & override</h2>${this._smartPresenceButtons()}<div class="fact-row"><span>Control source</span><b>${e(SOURCES[zone.source] || zone.source)}</b></div><div class="fact-row"><span>Schedule target</span><b>${e(this._temp(zone.week[local.day][periodIndex(zone.week[local.day],local.minute)].temperature))}</b></div></section>
-      <section class="panel"><h2>Why this temperature?</h2><div class="reason"><b>${e(SOURCES[zone.source] || zone.source)} · ${e(this._temp(zone.proposed_target))}</b><p>${e(zone.reason)}</p></div><small>This is the scheduler’s proposed target. Your thermostat and existing controls still manage the heating.</small></section></div>`;
+      ${this._occupancySummary(zone)}<div class="timeline-wrap">${this._timeline(zone.week[local.day], local.day,true)}<div class="time-marker" style="left:${local.minute/1440*100}%"><span style="transform:translateX(${local.minute<60?0:local.minute>1380?-100:-50}%)">${e(local.time)}</span></div></div><div class="ticks"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div><div class="legend"><span><i></i>Comfort target</span><span><i class="cool"></i>Setback target</span></div>${button('Edit today’s periods →','schedule',`data-zone="${e(zone.id)}"`,'link-button')}</section>
+      <div class="bottom-grid"><section class="panel"><div class="scope">Selected zone</div><h2>Temporary occupancy</h2>${this._smartPresenceButtons()}<div class="fact-row"><span>Control source</span><b>${e(SOURCES[zone.source] || zone.source)}</b></div><div class="fact-row"><span>Schedule target</span><b>${e(this._temp(zone.week[local.day][periodIndex(zone.week[local.day],local.minute)].temperature))}</b></div></section>
+      <section class="panel"><h2>Why this temperature?</h2><div class="reason"><b>${e(SOURCES[zone.source] || zone.source)} · ${e(this._temp(zone.proposed_target))}</b><p>${e(zone.reason)}</p></div><small>${this._data.observe_only?'This is the scheduler’s proposed target. Existing controls still manage the heating.':'This scheduler controls the mapped thermostat. Manual Off and higher-priority overrides are respected.'}</small></section></div>`;
   }
   _schedules() {
     const zone = this._zone(), week = this._week(), periods = week[this._day];
@@ -233,16 +242,16 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     return `<div class="zone-picker"><div><div class="eyebrow">Weekly planner</div><h2>${e(zone.name)}</h2><div class="status-caption">${this._canEdit() ? 'Select a period to edit its time and temperature.' : 'Read-only schedule. Ask an administrator to make changes.'}</div></div>${this._selector()}</div>
       <div class="toolbar" style="margin-bottom:16px">${button('Copy day','copy-day',this._canEdit()?'':'disabled')}${button('Copy week from zone','copy-week',otherZones.length && this._canEdit()?'':'disabled')}${button('Undo','undo',this._history.length&&!this._saving?'':'disabled')}</div>
       ${this._conflict ? `<div class="error" role="alert">This week changed elsewhere. Your unsaved draft has been kept. ${button('Load latest','latest')}</div>` : ''}
-      <div class="planner-layout"><section class="panel desktop-only"><div class="section-head"><h3>Seven-day overview</h3><small>${e(zone.unit)}</small></div><div class="ticks" style="margin:0 0 10px 53px"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>${DAYS.map((day,index) => `<div class="week-row ${day === this._day ? 'active' : ''}">${button(DAY_NAMES[index].slice(0,3),'day',`data-day="${day}" aria-pressed="${day === this._day}"`)}${this._timeline(week[day],day,true)}</div>`).join('')}<div class="legend"><span><i></i>Comfort</span><span><i class="cool"></i>Setback</span></div></section>
+      <div class="planner-layout"><section class="panel desktop-only"><div class="section-head"><h3>Seven-day overview</h3><small>${e(zone.unit)}</small></div><div class="ticks" style="margin:0 0 10px 53px"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>${DAYS.map((day,index) => `<div class="week-row ${day === this._day ? 'active' : ''}">${button(DAY_NAMES[index].slice(0,3),'day',`data-day="${day}" aria-pressed="${day === this._day}"`)}<div>${this._timeline(week[day],day,true)}${this._occupancyBand(zone,day)}</div></div>`).join('')}<div class="legend"><span><i></i>Comfort</span><span><i class="cool"></i>Setback</span></div></section>
       <section class="panel"><div class="section-head"><h3>${e(DAY_NAMES[DAYS.indexOf(this._day)])} periods</h3><small>${periods.length} periods</small></div><div class="days">${DAYS.map((day,index)=>button(DAY_NAMES[index].slice(0,3),'day',`data-day="${day}" aria-pressed="${day===this._day}"`,day===this._day?'selected':'')).join('')}</div>
-      <div class="period-list">${periods.map((period,index)=>`<div class="period-row"><div><b>${e(period.label || 'Period '+(index+1))}</b><p>${e(period.start)} – ${e(periods[index+1]?.start || '24:00')}</p></div><span class="temp-pill ${period.temperature>Math.min(...periods.map(p=>p.temperature))?'warm':''}">${e(this._temp(period.temperature))}</span>${button('✎','edit',`data-index="${index}" aria-label="Edit ${e(period.label || 'period')} ${e(period.start)}" ${this._canEdit()?'':'disabled'}`,'link-button')}</div>`).join('')}</div>
+      ${this._occupancySummary(zone,this._day)}<div class="period-list">${periods.map((period,index)=>`<div class="period-row"><div><b>${e(period.label || 'Period '+(index+1))}</b><p>${e(period.start)} – ${e(periods[index+1]?.start || '24:00')}</p></div><span class="temp-pill ${period.temperature>Math.min(...periods.map(p=>p.temperature))?'warm':''}">${e(this._temp(period.temperature))}</span>${button('✎','edit',`data-index="${index}" aria-label="Edit ${e(period.label || 'period')} ${e(period.start)}" ${this._canEdit()?'':'disabled'}`,'link-button')}</div>`).join('')}</div>
       <div class="toolbar" style="margin-top:14px">${button('+ Add period','split',this._canEdit()?'':'disabled')}</div><div class="status-caption">New periods split the first block. Use “Split period” when editing another block.</div></section></div>
       <div class="draft-bar"><span class="${this._draft?'dirty':'muted'}">${this._draft?'● Unsaved changes':'All changes saved'}${this._config.demo?' · Demo only':''}</span><div class="toolbar">${button('Cancel','cancel-draft',this._draft&&!this._saving?'':'disabled')}${button(this._saving?'Saving…':'Save changes','save',this._draft&&this._canEdit()&&!this._saving?'':'disabled','primary')}</div></div>`;
   }
   _automation() { return this._smartAutomation(); }
   _settings() {
     const zone = this._zone();
-    return `<div class="zone-picker"><div><div class="eyebrow">Zone setup</div><h2>Settings</h2></div>${this._selector()}</div><div class="settings-grid"><section class="panel"><div class="scope">Selected zone</div><h2>${e(zone.name)}</h2><div class="fact-row"><span>Thermostat</span><b>${e(zone.climate_entity || 'Sample thermostat')}</b></div><div class="fact-row"><span>Reviewed limits</span><b>${e(this._temp(zone.limits.minimum))} – ${e(this._temp(zone.limits.maximum))}</b></div><div class="fact-row"><span>Temperature step</span><b>${zone.limits.step?e(this._temp(zone.limits.step)):'Not reported'}</b></div><div class="fact-row"><span>Manual target hold</span><b>${e({next_period:'Until next period',duration:`${zone.manual_minutes} minutes`,until_resume:'Until resumed'}[zone.manual_policy])}</b></div><div class="fact-row"><span>Existing boost</span><b>${zone.boost.owner==='external'?'External timer':zone.boost.owner==='builtin'?'Built-in boost':'Disabled'}</b></div>${!this._config.demo && this._data.can_edit ? '<a class="shs-link" href="/config/integrations/integration/smart_heating_scheduler">Manage zones in Home Assistant →</a>' : '<small>Thermostat mappings and limits are managed through the integration setup.</small>'}</section>
+    return `<div class="zone-picker"><div><div class="eyebrow">Zone setup</div><h2>Settings</h2></div>${this._selector()}</div><div class="settings-grid">${this._occupancySettings()}<section class="panel"><div class="scope">Selected zone</div><h2>${e(zone.name)}</h2><div class="fact-row"><span>Thermostat</span><b>${e(zone.climate_entity || 'Sample thermostat')}</b></div><div class="fact-row"><span>Reviewed limits</span><b>${e(this._temp(zone.limits.minimum))} – ${e(this._temp(zone.limits.maximum))}</b></div><div class="fact-row"><span>Temperature step</span><b>${zone.limits.step?e(this._temp(zone.limits.step)):'Not reported'}</b></div><div class="fact-row"><span>Manual target hold</span><b>${e({next_period:'Until next period',duration:`${zone.manual_minutes} minutes`,until_resume:'Until resumed'}[zone.manual_policy])}</b></div><div class="fact-row"><span>Existing boost</span><b>${zone.boost.owner==='external'?'External timer':zone.boost.owner==='builtin'?'Built-in boost':'Disabled'}</b></div>${!this._config.demo && this._data.can_edit ? '<a class="shs-link" href="/config/integrations/integration/smart_heating_scheduler">Manage zones in Home Assistant →</a>' : '<small>Thermostat mappings and limits are managed through the integration setup.</small>'}</section>
       <section class="panel"><div class="scope">This card</div><h2>Appearance</h2><label style="margin-top:16px">Theme<select data-action="theme-select" aria-label="Card theme">${['auto','dark','light'].map(t=>`<option value="${t}" ${this._config.theme===t?'selected':''}>${{auto:'Follow Home Assistant',dark:'Dark',light:'Light'}[t]}</option>`).join('')}</select></label><div class="reason"><b>Responsive by design</b><p>Side-by-side zones on desktop. Stacked cards and a day-by-day period editor on your phone.</p></div><small>Use the Lovelace card editor to save the title, initial view and theme.</small></section></div><div class="settings-grid" style="margin-top:18px">${this._smartSettings()}</div>`;
   }
   _modal() {
@@ -291,7 +300,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
   }
 }
 
-Object.assign(SmartHeatingSchedulerCard.prototype, smartUI);
+Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI);
 
 export class SmartHeatingSchedulerCardEditor extends HTMLElement {
   constructor() { super(); this.attachShadow({mode:'open'}); this._entries=[]; this.shadowRoot.addEventListener('change',event=>{const key=event.target.dataset.config; if(!key)return; this._config={...this._config,[key]:event.target.value}; this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));}); }
