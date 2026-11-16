@@ -1,3 +1,9 @@
+# 0.5.1 — independent frost range (prepared, not yet released)
+
+- Frost target input uses the backend’s verified hardware range instead of the normal schedule minimum.
+- Explain that normal schedule/manual bounds remain unchanged; requires backend 0.5.1 for the independent range.
+- Preserve frost opt-in, Off permission and existing mini-card layout.
+
 # 0.5.0 — setup, frost, backups and preheating feedback
 
 - Guided zone setup guidance and HA wizard entry point.

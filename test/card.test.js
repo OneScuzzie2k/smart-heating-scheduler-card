@@ -212,3 +212,12 @@ test('zone settings restore requires disabled destination and explicit mapping a
   z.enabled=false;h.card._dialog.ack=true;await h.card._transferAction('restore');assert.equal(z.insights.settings.preheat_enabled,true);assert.equal(z.enabled,false);assert.equal(h.card._dialog,null);
  }finally{h.close();}
 });
+
+test('frost uses hardware minimum independently of schedule and manual limits',async()=>{
+ const h=await setup();try{
+  const z=h.card._zone();z.frost_limits={minimum:5,maximum:28,step:.5};
+  click(h.root,'nav','[data-view="settings"]');h.root.querySelector('[data-feature="frost_enabled"]').click();
+  const input=h.root.querySelector('[data-feature="frost_target"]');assert.equal(input.min,'5');input.value='12';input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
+  click(h.root,'feature-save');await settle();assert.equal(z.insights.settings.frost_target,12);assert.equal(z.limits.minimum,16);assert.match(h.root.textContent,/Normal schedule and manual limits are unchanged/);
+ }finally{h.close();}
+});
