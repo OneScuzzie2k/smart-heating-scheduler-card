@@ -221,3 +221,16 @@ test('frost uses hardware minimum independently of schedule and manual limits',a
   click(h.root,'feature-save');await settle();assert.equal(z.insights.settings.frost_target,12);assert.equal(z.limits.minimum,16);assert.match(h.root.textContent,/Normal schedule and manual limits are unchanged/);
  }finally{h.close();}
 });
+
+test('failed settings save remains visible beside Save across live updates and clears after success',async()=>{
+ const h=await setup();try{
+  click(h.root,'nav','[data-view="settings"]');h.root.querySelector('[data-feature="frost_enabled"]').click();
+  const input=h.root.querySelector('[data-feature="frost_target"]');input.value='12';input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
+  const server=structuredClone(h.card._data);h.card._config.demo=false;h.card._status='connected';
+  h.card._hass={callWS:async()=>{throw Error('Target outside reviewed limits');}};
+  click(h.root,'feature-save');await settle();h.card._receive(structuredClone(server));
+  assert.ok(h.card._featureDraft);assert.match(h.root.querySelector('[data-feature-save-error]').textContent,/Target outside reviewed limits/);assert.match(h.root.textContent,/Save failed · changes not applied/);
+  h.card._hass.callWS=async()=>server;click(h.root,'feature-save');await settle();
+  assert.equal(h.card._featureDraft,null);assert.equal(h.root.querySelector('[data-feature-save-error]'),null);assert.match(h.root.textContent,/Zone features updated/);
+ }finally{h.close();}
+});

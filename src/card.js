@@ -144,7 +144,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
         this._zoneId = data.zones[0]?.id;
       }
       if (this._draft && this._zone()?.revision !== this._revision) this._conflict = true;
-      if (!this._draft) this._error = '';
+      if (!this._draft && !this._featureDraft) this._error = '';
     } catch (error) { this._error = error.message; this._status = 'error'; }
     this._render();
   }
@@ -167,7 +167,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     if (!this._draft && !this._featureDraft) { action(); return; }
     this._pending = action; this._dialog = {kind:'discard'}; this._focusDialog = true; this._render();
   }
-  _selectZone(id) { this._featureDraft=null; this._zoneId = id; this._draft = null; this._history = []; this._error = ''; this._conflict = false; this._render(); }
+  _selectZone(id) { this._featureDraft=null; this._featureSaveError=''; this._zoneId = id; this._draft = null; this._history = []; this._error = ''; this._conflict = false; this._render(); }
   _mutate(week) {
     if (!this._canEdit() || this._saving) return;
     validateWeek(week, this._zone().limits);

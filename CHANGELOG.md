@@ -3,6 +3,7 @@
 - Frost target input uses the backend’s verified hardware range instead of the normal schedule minimum.
 - Explain that normal schedule/manual bounds remain unchanged; requires backend 0.5.1 for the independent range.
 - Preserve frost opt-in, Off permission and existing mini-card layout.
+- Keep failed-save explanations visible next to Save settings across live status updates, while preserving the unsaved draft.
 
 # 0.5.0 — setup, frost, backups and preheating feedback
 

@@ -15,7 +15,7 @@ export const insightsUI={
   _featureSettings(){return this._featureDraft?.zone===this._zone().id?this._featureDraft.settings:this._zone().insights?.settings;},
   _featureEdit(){
     const z=this._zone();if(!this._canEdit()||!z.insights||this._saving)return null;
-    if(!this._featureDraft)this._featureDraft={zone:z.id,revision:z.insights.revision,settings:clone(z.insights.settings)};
+    if(!this._featureDraft){this._featureSaveError='';this._featureDraft={zone:z.id,revision:z.insights.revision,settings:clone(z.insights.settings)};}
     return this._featureDraft.settings;
   },
   _featureInput(target){
@@ -55,7 +55,7 @@ export const insightsUI={
     <div><h3>Workday rules</h3>${this._featureField('workday_entity','Workday sensor (optional)',s.workday_entity,'text','list="feature-entities" placeholder="binary_sensor.workday"')}<label>On a workday<select data-feature="workday_profile">${this._profileOptions(s.workday_profile)}</select></label><label>On a non-workday<select data-feature="non_workday_profile">${this._profileOptions(s.non_workday_profile)}</select></label><p class="muted">Uses your Home Assistant Workday integration, including its configured public holidays. Leave the sensor empty to use only calendar rules.</p><h3>Calendar rules</h3>${s.calendar_rules.map((r,i)=>`<div class="calendar-rule"><label>Calendar<input data-feature="entity_id" data-rule-row="${i}" value="${e(r.entity_id)}" list="feature-entities" placeholder="calendar.example"></label><label>Event title contains<input data-feature="match" data-rule-row="${i}" value="${e(r.match)}" placeholder="Blank matches any event" maxlength="80"></label><label>Use profile<select data-feature="profile" data-rule-row="${i}">${this._profileOptions(r.profile,'Choose a profile')}</select></label>${btn('Remove rule','remove-rule',disabled,`data-index="${i}"`)}</div>`).join('')}${btn('Add calendar rule','add-rule',disabled||!names.length)}<p class="muted">Rules run from top to bottom. Missing inputs show a warning and fall back to the remaining rules. Event titles are used for matching and excluded from history.</p></div></div></fieldset>${this._featureSaveBar()}</section>`;
   },
   _featureSaveBar(){
-    const dirty=Boolean(this._featureDraft);return `<div class="draft-bar" data-feature-savebar ${dirty?'':'hidden'}><span data-feature-dirty class="${dirty?'dirty':'muted'}">${dirty?'● Unsaved settings':'Settings saved'}</span><div class="toolbar">${btn('Reload saved','reload',!this._canEdit()||this._saving)}${btn(this._saving?'Saving…':'Save settings','save',!dirty||!this._canEdit()||this._saving,'class="primary"')}</div></div>`;
+    const dirty=Boolean(this._featureDraft),error=dirty?this._featureSaveError:'';return `<div class="draft-bar" data-feature-savebar ${dirty?'':'hidden'}><span data-feature-dirty class="${dirty?'dirty':'muted'}">${error?'Save failed · changes not applied':dirty?'● Unsaved settings':'Settings saved'}</span><div class="toolbar">${btn('Reload saved','reload',!this._canEdit()||this._saving)}${btn(this._saving?'Saving…':'Save settings','save',!dirty||!this._canEdit()||this._saving,'class="primary"')}</div>${error?`<p class="error feature-save-error" role="alert" data-feature-save-error>${e(error)}</p>`:''}</div>`;
   },
   _frostSettings(){
     const z=this._zone(),s=this._featureSettings();if(!s)return '';
@@ -100,7 +100,7 @@ export const insightsUI={
     if(!this._canEdit()||this._saving)return;
     const z=this._zone();if(!z.insights){this._error='Update the integration first.';this._render();return;}
     try{
-      if(action==='reload'){this._featureDraft=null;this._error='';this._render();return;}
+      if(action==='reload'){this._featureDraft=null;this._featureSaveError='';this._error='';this._render();return;}
       let command='insights';
       if(action==='reset-learning'||action==='clear-history'){
         if(this._featureDraft)throw Error('Save or reload zone features before resetting history or learning.');
@@ -132,15 +132,15 @@ export const insightsUI={
       }
       const payload={revision:this._featureDraft?.revision??z.insights.revision};
       if(command==='insights')payload.settings=clone(this._featureDraft.settings);
-      this._saving=true;this._error='';this._render();
+      this._saving=true;this._featureSaveError='';this._error='';this._message='';this._render();
       if(this._config.demo){
         if(command==='insights'){z.insights.settings=payload.settings;z.insights.preheat.state=payload.settings.preheat_enabled?'learning':'disabled';z.insights.frost={state:payload.settings.frost_enabled?'waiting':'disabled',target:payload.settings.frost_target};}
         if(command==='clear_history'){z.insights.samples=[];z.insights.decisions=[];}
         if(command==='reset_learning')z.insights.preheat={state:'learning',rate:null,samples:0,minutes:0};
         z.insights.revision++;
       } else this._data=await this._hass.callWS({type:'smart_heating_scheduler/control',entry_id:this._config.entry_id,zone_id:z.id,action:command,payload});
-      this._featureDraft=null;this._message=this._config.demo?'Saved to this demo only. Your heating is unchanged.':'Zone features updated.';
-    }catch(error){this._error=error.message||'Could not save zone features. Your draft has been kept.';}
+      this._featureDraft=null;this._featureSaveError='';this._message=this._config.demo?'Saved to this demo only. Your heating is unchanged.':'Zone features updated.';
+    }catch(error){const reason=error.message||'Check the connection and try again.';this._error=action==='save'?`Could not save settings. ${reason} Your changes are still unsaved.`:reason;if(action==='save'&&this._featureDraft)this._featureSaveError=this._error;}
     finally{this._saving=false;this._render();}
   },
 };

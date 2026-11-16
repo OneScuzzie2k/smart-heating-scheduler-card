@@ -244,7 +244,10 @@
     _featureEdit() {
       const z = this._zone();
       if (!this._canEdit() || !z.insights || this._saving) return null;
-      if (!this._featureDraft) this._featureDraft = { zone: z.id, revision: z.insights.revision, settings: clone(z.insights.settings) };
+      if (!this._featureDraft) {
+        this._featureSaveError = "";
+        this._featureDraft = { zone: z.id, revision: z.insights.revision, settings: clone(z.insights.settings) };
+      }
       return this._featureDraft.settings;
     },
     _featureInput(target) {
@@ -291,8 +294,8 @@
     <div><h3>Workday rules</h3>${this._featureField("workday_entity", "Workday sensor (optional)", s.workday_entity, "text", 'list="feature-entities" placeholder="binary_sensor.workday"')}<label>On a workday<select data-feature="workday_profile">${this._profileOptions(s.workday_profile)}</select></label><label>On a non-workday<select data-feature="non_workday_profile">${this._profileOptions(s.non_workday_profile)}</select></label><p class="muted">Uses your Home Assistant Workday integration, including its configured public holidays. Leave the sensor empty to use only calendar rules.</p><h3>Calendar rules</h3>${s.calendar_rules.map((r, i) => `<div class="calendar-rule"><label>Calendar<input data-feature="entity_id" data-rule-row="${i}" value="${escapeHTML(r.entity_id)}" list="feature-entities" placeholder="calendar.example"></label><label>Event title contains<input data-feature="match" data-rule-row="${i}" value="${escapeHTML(r.match)}" placeholder="Blank matches any event" maxlength="80"></label><label>Use profile<select data-feature="profile" data-rule-row="${i}">${this._profileOptions(r.profile, "Choose a profile")}</select></label>${btn("Remove rule", "remove-rule", disabled, `data-index="${i}"`)}</div>`).join("")}${btn("Add calendar rule", "add-rule", disabled || !names.length)}<p class="muted">Rules run from top to bottom. Missing inputs show a warning and fall back to the remaining rules. Event titles are used for matching and excluded from history.</p></div></div></fieldset>${this._featureSaveBar()}</section>`;
     },
     _featureSaveBar() {
-      const dirty = Boolean(this._featureDraft);
-      return `<div class="draft-bar" data-feature-savebar ${dirty ? "" : "hidden"}><span data-feature-dirty class="${dirty ? "dirty" : "muted"}">${dirty ? "\u25CF Unsaved settings" : "Settings saved"}</span><div class="toolbar">${btn("Reload saved", "reload", !this._canEdit() || this._saving)}${btn(this._saving ? "Saving\u2026" : "Save settings", "save", !dirty || !this._canEdit() || this._saving, 'class="primary"')}</div></div>`;
+      const dirty = Boolean(this._featureDraft), error = dirty ? this._featureSaveError : "";
+      return `<div class="draft-bar" data-feature-savebar ${dirty ? "" : "hidden"}><span data-feature-dirty class="${dirty ? "dirty" : "muted"}">${error ? "Save failed \xB7 changes not applied" : dirty ? "\u25CF Unsaved settings" : "Settings saved"}</span><div class="toolbar">${btn("Reload saved", "reload", !this._canEdit() || this._saving)}${btn(this._saving ? "Saving\u2026" : "Save settings", "save", !dirty || !this._canEdit() || this._saving, 'class="primary"')}</div>${error ? `<p class="error feature-save-error" role="alert" data-feature-save-error>${escapeHTML(error)}</p>` : ""}</div>`;
     },
     _frostSettings() {
       const z = this._zone(), s = this._featureSettings();
@@ -374,6 +377,7 @@
       try {
         if (action === "reload") {
           this._featureDraft = null;
+          this._featureSaveError = "";
           this._error = "";
           this._render();
           return;
@@ -419,7 +423,9 @@
         const payload = { revision: this._featureDraft?.revision ?? z.insights.revision };
         if (command === "insights") payload.settings = clone(this._featureDraft.settings);
         this._saving = true;
+        this._featureSaveError = "";
         this._error = "";
+        this._message = "";
         this._render();
         if (this._config.demo) {
           if (command === "insights") {
@@ -435,9 +441,12 @@
           z.insights.revision++;
         } else this._data = await this._hass.callWS({ type: "smart_heating_scheduler/control", entry_id: this._config.entry_id, zone_id: z.id, action: command, payload });
         this._featureDraft = null;
+        this._featureSaveError = "";
         this._message = this._config.demo ? "Saved to this demo only. Your heating is unchanged." : "Zone features updated.";
       } catch (error) {
-        this._error = error.message || "Could not save zone features. Your draft has been kept.";
+        const reason = error.message || "Check the connection and try again.";
+        this._error = action === "save" ? `Could not save settings. ${reason} Your changes are still unsaved.` : reason;
+        if (action === "save" && this._featureDraft) this._featureSaveError = this._error;
       } finally {
         this._saving = false;
         this._render();
@@ -511,6 +520,8 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
 .zone-management{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.add-zone-link{border:1px solid var(--shs-line);border-radius:12px;padding:9px 14px;min-height:44px;text-decoration:none;font-size:13px;font-weight:600;background:var(--shs-panel)}.zone-help{font-size:12px;margin:-2px 0 16px}@container(max-width:650px){.zone-management{display:grid;grid-template-columns:1fr}.zone-management .add-zone-link{justify-content:center}.zone-help{margin:0 0 16px}}
 
 .learning-progress{width:100%;height:8px;accent-color:var(--shs-teal)}textarea{width:100%;box-sizing:border-box;max-width:100%;border:1px solid var(--shs-line);border-radius:10px;background:var(--shs-panel2);color:var(--shs-ink);padding:12px}.import-preview{max-height:220px;overflow:auto;font-size:12px;line-height:1.8;overflow-wrap:anywhere}.modal .toolbar{flex-wrap:wrap}.modal{max-width:calc(100cqw - 32px)}.modal input[type=file]{max-width:100%;min-width:0}
+
+.feature-save-error{flex-basis:100%;margin:0;overflow-wrap:anywhere}.smart-feature .draft-bar{flex-wrap:wrap}
 `;
 
   // src/occupancy-ui.js
@@ -1233,7 +1244,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
           this._zoneId = data.zones[0]?.id;
         }
         if (this._draft && this._zone()?.revision !== this._revision) this._conflict = true;
-        if (!this._draft) this._error = "";
+        if (!this._draft && !this._featureDraft) this._error = "";
       } catch (error) {
         this._error = error.message;
         this._status = "error";
@@ -1279,6 +1290,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
     }
     _selectZone(id) {
       this._featureDraft = null;
+      this._featureSaveError = "";
       this._zoneId = id;
       this._draft = null;
       this._history = [];
