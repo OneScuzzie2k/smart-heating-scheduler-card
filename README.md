@@ -1,16 +1,8 @@
 # Smart Heating Scheduler Card
 
-**Test release 0.4.0-dev.3** adds calendar/Workday profile forms, a History tab
-with temperature and decision timelines, and optional smart-preheating settings.
-Requires backend 0.4.0.dev1 for these features. Existing mini thermostat layout is
-preserved. This is an opt-in prerelease; 0.3.0 remains the stable card release. See the backend
-[feature guide](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/PROFILES_HISTORY_PREHEATING.md)
-for feature setup and validation limits. Card Settings has an Add heating zone shortcut to Home Assistant zone setup.
+A companion Lovelace card for [Smart Heating Scheduler](https://github.com/OneScuzzie2k/smart-heating-scheduler), with a full weekly planner, calendar profiles, heating history, optional smart-preheating settings and compact thermostat/boost cards. Supports desktop, tablet and phone layouts, plus Home Assistant light/dark themes.
 
-
-A companion Lovelace card for [Smart Heating Scheduler](https://github.com/OneScuzzie2k/smart-heating-scheduler), with a full weekly planner and a compact thermostat/boost layout. Supports desktop, tablet and phone layouts, plus Home Assistant light/dark themes.
-
-**Stable release:** [card 0.3.0](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.3.0), compatible with [integration 0.3.1](https://github.com/OneScuzzie2k/smart-heating-scheduler/releases/tag/0.3.1). Requires **Home Assistant Core 2026.11.1 or newer**. The integration and card are installed separately. The backend patch fixes legacy timer migration and reload cleanup; no card update is needed. This card promotes the tested dev.5 frontend without layout or heating-command changes; see [acceptance scope](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/RELEASE_ACCEPTANCE.md).
+**Stable release 0.4.0:** install this [card](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.4.0) and the [integration](https://github.com/OneScuzzie2k/smart-heating-scheduler/releases/tag/0.4.0). Requires **Home Assistant Core 2026.11.1 or newer**. The two packages are installed separately; including pre-releases is not required. See [feature setup and limits](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/PROFILES_HISTORY_PREHEATING.md) and [acceptance scope](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/RELEASE_ACCEPTANCE.md).
 
 **[Full installation and setup guide](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md)** - zone setup, schedules, boost choices, occupancy, heating-control handover, updates and rollback.
 
@@ -35,8 +27,8 @@ Desktop and phone layouts from the working 0.3.0 card. These screenshots use sam
 1. In **Settings > Marketplace**, choose **Add from link** and add:
    `https://github.com/OneScuzzie2k/smart-heating-scheduler-card`.
    Check that the repository is shown as type **Dashboard**.
-2. Select stable **0.3.0**; use **Install another version** if needed. Install the card. Include pre-releases is not required.
-3. Install [the backend repository](https://github.com/OneScuzzie2k/smart-heating-scheduler) separately as type **Integration**, version **0.3.1**. Follow its restart prompt. Under **Settings > Devices & services**, add **Smart Heating Scheduler (Preview)**, then **Add heating zone** for each thermostat.
+2. Select stable **0.4.0**; use **Install another version** if needed. Install the card. Include pre-releases is not required.
+3. Install [the backend repository](https://github.com/OneScuzzie2k/smart-heating-scheduler) separately as type **Integration**, version **0.4.0**. Follow its restart prompt. Under **Settings > Devices & services**, add **Smart Heating Scheduler**, then **Add heating zone** for each thermostat.
 4. Allow Marketplace to register the JavaScript resource, then reload your browser or Companion App frontend. For YAML-managed resources, add the module entry shown in the install dialog. Register it once.
 5. On an editable dashboard, select **Edit dashboard > Add card > Smart Heating Scheduler**. Choose **Full scheduler** and select your scheduler from the **Scheduler** field. Save and confirm **Observe only**.
 6. Create the weekly schedules in the full card. Follow the [reviewed handover](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#6-hand-over-heating-control) when ready to enable real heating control. This is global to every enabled zone.
@@ -47,13 +39,13 @@ The visual editor supplies the scheduler `entry_id` automatically. To use YAML, 
 
 ### Manual card installation
 
-Download **smart-heating-scheduler-card.js** from the [release assets](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.3.0). Copy it to `<config>/www/smart-heating-scheduler-card.js` and register `/local/smart-heating-scheduler-card.js` as a **JavaScript module** dashboard resource (`type: module` for a YAML resource list). Reload the frontend. The backend must also be installed; see its [manual installation instructions](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#manual-installation).
+Download **smart-heating-scheduler-card.js** from the [release assets](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.4.0). Copy it to `<config>/www/smart-heating-scheduler-card.js` and register `/local/smart-heating-scheduler-card.js` as a **JavaScript module** dashboard resource (`type: module` for a YAML resource list). Reload the frontend. The backend must also be installed; see its [manual installation instructions](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#manual-installation).
 
 For updates, reload all frontends after replacing the card. A card-only update needs no HA restart. Use one installation method/resource entry so multiple versions are not loaded together.
 
 ### If the card does not appear
 
-Check the Dashboard package is installed, the resource is registered as a module once, and the frontend has been reloaded. If no scheduler/zones load, complete backend setup and choose Scheduler in the editor. Check logs and the user's mapped-climate permissions. The backend setup entry is currently named **Heating Scheduler Preview**, even when heating control is enabled.
+Check the Dashboard package is installed, the resource is registered as a module once, and the frontend has been reloaded. If no scheduler/zones load, complete backend setup and choose Scheduler in the editor. Check logs and the user's mapped-climate permissions. Older installations may retain the entry name **Heating Scheduler Preview**; the name does not determine control mode. Use Settings → Add heating zone to open HA zone setup.
 
 ## Working controls
 

@@ -188,7 +188,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
         const snapshot = await this._hass.callWS({type:`${DOMAIN}/save_schedule`, entry_id:this._config.entry_id, zone_id:zone.id, revision:this._revision, week});
         this._data = snapshot;
       }
-      this._draft = null; this._history = []; this._conflict = false; this._message = this._config.demo ? 'Saved to this demo only. Your heating is unchanged.' : this._data.observe_only?'Preview schedule saved. Heating controls are unchanged.':'Schedule saved. Heating rules re-evaluated.';
+      this._draft = null; this._history = []; this._conflict = false; this._message = this._config.demo ? 'Saved to this demo only. Your heating is unchanged.' : this._data.observe_only?'Schedule saved in observe-only mode. Heating controls are unchanged.':'Schedule saved. Heating rules re-evaluated.';
     } catch (error) {
       this._error = error.code === 'revision_conflict' ? 'This schedule changed elsewhere. Your draft is safe. Load the latest version before trying again.' : `Could not save. Your draft is safe. ${error.message || 'Check the connection and try again.'}`;
     } finally { this._saving = false; this._render(); }
@@ -348,4 +348,4 @@ export class SmartHeatingSchedulerCardEditor extends HTMLElement {
 if (!customElements.get('smart-heating-scheduler-card')) customElements.define('smart-heating-scheduler-card', SmartHeatingSchedulerCard);
 if (!customElements.get('smart-heating-scheduler-card-editor')) customElements.define('smart-heating-scheduler-card-editor', SmartHeatingSchedulerCardEditor);
 window.customCards = window.customCards || [];
-if (!window.customCards.some(card=>card.type==='smart-heating-scheduler-card')) window.customCards.push({type:'smart-heating-scheduler-card',name:'Smart Heating Scheduler',description:'Responsive heating schedules and observe-only proposals',preview:true});
+if (!window.customCards.some(card=>card.type==='smart-heating-scheduler-card')) window.customCards.push({type:'smart-heating-scheduler-card',name:'Smart Heating Scheduler',description:'Heating schedules, boost, occupancy, history and optional preheating',preview:true});
