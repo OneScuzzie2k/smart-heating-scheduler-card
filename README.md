@@ -1,5 +1,13 @@
 # Smart Heating Scheduler Card
 
+**Test release 0.4.0-dev.1** adds calendar/Workday profile forms, a History tab
+with temperature and decision timelines, and optional smart-preheating settings.
+Requires backend 0.4.0.dev1 for these features. Existing mini thermostat layout is
+preserved. This is an opt-in prerelease; 0.3.0 remains the stable card release. See the backend
+[feature guide](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/PROFILES_HISTORY_PREHEATING.md)
+for feature setup and validation limits. Card Settings has an Add heating zone shortcut to Home Assistant zone setup.
+
+
 A companion Lovelace card for [Smart Heating Scheduler](https://github.com/OneScuzzie2k/smart-heating-scheduler), with a full weekly planner and a compact thermostat/boost layout. Supports desktop, tablet and phone layouts, plus Home Assistant light/dark themes.
 
 **Stable release:** [card 0.3.0](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.3.0), compatible with [integration 0.3.1](https://github.com/OneScuzzie2k/smart-heating-scheduler/releases/tag/0.3.1). Requires **Home Assistant Core 2026.11.1 or newer**. The integration and card are installed separately. The backend patch fixes legacy timer migration and reload cleanup; no card update is needed. This card promotes the tested dev.5 frontend without layout or heating-command changes; see [acceptance scope](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/RELEASE_ACCEPTANCE.md).

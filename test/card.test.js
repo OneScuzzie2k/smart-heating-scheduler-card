@@ -19,6 +19,54 @@ test('subscription is disposed on removal and unsupported API shows an error',as
 test('stale saves retain draft and make the conflict actionable',async()=>{const h=await setup();try{click(h.root,'nav','[data-view="schedules"]');click(h.root,'split');h.card._config.demo=false;h.card._status='connected';h.card._hass={callWS:async()=>{throw {code:'revision_conflict'};}};click(h.root,'save');await new Promise(r=>setTimeout(r,0));assert.ok(h.card._draft);assert.match(h.root.textContent,/draft is safe/);}finally{h.close();}});
 
 const settle=()=>new Promise(r=>setTimeout(r,0));
+
+test('history has real chart paths, owner explanations, range switching and disabled state',async()=>{
+  const h=await setup();try{
+    click(h.root,'nav','[data-view="heatingHistory"]');
+    assert.equal(h.root.querySelectorAll('.history-chart path').length,2);
+    assert.match(h.root.textContent,/Why the heating changed/);
+    click(h.root,'feature-history-range','[data-hours="168"]');assert.equal(h.card._historyRange,168);
+    h.card._zone().insights.settings.history_enabled=false;h.card._render();assert.match(h.root.textContent,/History is disabled/);
+  }finally{h.close();}
+});
+
+test('profiles copy selected day independently, validate targets, and preserve unsaved drafts on navigation',async()=>{
+  const h=await setup();try{
+    click(h.root,'nav','[data-view="schedules"]');h.root.querySelector('[data-new-profile]').value='New profile';click(h.root,'feature-create-profile');
+    const input=h.root.querySelector('[data-feature="temperature"][data-profile-row="0"]');input.value='19';input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
+    assert.equal(h.card._zone().week.mon[0].temperature,16);
+    click(h.root,'nav','[data-view="dashboard"]');assert.ok(h.root.querySelector('[role=dialog]'));click(h.root,'close');
+    click(h.root,'feature-save');await settle();assert.equal(h.card._zone().insights.settings.profiles['New profile'][0].temperature,19);assert.equal(h.card._featureDraft,null);
+  }finally{h.close();}
+});
+
+test('preheat settings survive subscriptions and stale backend rejection retains the feature draft',async()=>{
+  const h=await setup();try{
+    click(h.root,'nav','[data-view="settings"]');const toggle=h.root.querySelector('[data-feature="preheat_enabled"]');toggle.checked=true;toggle.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
+    h.card._receive(structuredClone(h.card._data));assert.equal(h.root.querySelector('[data-feature="preheat_enabled"]').checked,true);
+    const calls=[];h.card._config.demo=false;h.card._status='connected';h.card._hass={callWS:async request=>{calls.push(request);throw Error('Zone features changed elsewhere');}};
+    click(h.root,'feature-save');await settle();assert.ok(h.card._featureDraft);assert.match(h.root.textContent,/changed elsewhere/);assert.equal(calls[0].payload.revision,1);assert.equal(calls[0].action,'insights');
+  }finally{h.close();}
+});
+
+test('read-only feature forms and all destructive feature actions are disabled',async()=>{
+  const h=await setup();try{
+    h.card._data.can_edit=false;h.card._render();click(h.root,'nav','[data-view="settings"]');
+    assert.equal(h.root.querySelector('[data-action="feature-reset-learning"]').disabled,true);
+    assert.equal(h.root.querySelector('[data-feature="preheat_enabled"]').closest('fieldset').disabled,true);
+    await h.card._featureAction('reset-learning',{});assert.equal(h.card._zone().insights.preheat.samples,7);
+    click(h.root,'nav','[data-view="heatingHistory"]');assert.equal(h.root.querySelector('[data-action="feature-clear-history"]').disabled,true);
+  }finally{h.close();}
+});
+
+test('profile names and decision reasons are escaped and mini cards stay uncluttered',async()=>{
+  const h=await setup();try{
+    h.card._zone().insights.active_profile='<img src=x onerror=bad()>';
+    h.card._zone().insights.decisions[0].reason='<script>bad()</script>';
+    click(h.root,'nav','[data-view="heatingHistory"]');assert.equal(h.root.querySelector('script'),null);assert.match(h.root.textContent,/<script>/);
+    h.card.setConfig({demo:true,layout:'mini'});assert.equal(h.root.querySelector('.feature-summary'),null);assert.equal(h.root.querySelector('nav'),null);
+  }finally{h.close();}
+});
 function setSmart(h,key,value){const input=h.root.querySelector(`[data-smart-field="${key}"]`);assert.ok(input,key);input.value=value;input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));}
 
 test('round dial previews drag without sending commands, survives snapshots and commits once on release',async()=>{

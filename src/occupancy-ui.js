@@ -11,10 +11,10 @@ export const occupancyUI = {
     const available=Object.entries(this._hass?.states||{}).filter(([id])=>/^(person|device_tracker|binary_sensor)\./.test(id));
     const days=this._smartValue('comfort_days',p.comfort_days.join(',')).split(',');
     return `<section class="panel occupancy-settings"><div class="scope">${e(z.name)} · zone setting</div><h2>Occupancy override</h2>
-      <p class="muted">Keep this zone at a minimum temperature while the selected people or sensors report it occupied, during the days and hours you choose. A higher scheduled target is kept.</p>
+      <p class="muted">Keep this zone at a minimum temperature when occupied, during your chosen days and hours.</p>
       <fieldset ${disabled?'disabled':''}>
-        <label class="occupancy-toggle"><input type="checkbox" role="switch" data-smart-field="comfort_enabled" ${enabled?'checked':''}>Enable occupancy override</label>
-        <div class="form-grid">
+        <label class="occupancy-toggle"><input type="checkbox" role="switch" aria-label="Enable occupancy override" data-smart-field="comfort_enabled" ${enabled?'checked':''}>Enable occupancy override</label>
+        ${this._disclosure('occupancy-rule','Configure occupancy rule',`<div class="form-grid">
           ${this._smartInput('comfort_target',`Occupied minimum (${z.unit})`,p.comfort_target??z.limits.minimum,'number',`min="${z.limits.minimum}" max="${z.limits.maximum}" step="${z.limits.step||'any'}"`)}
           ${this._smartSelect('home_rule','Zone is occupied when',p.home_rule,[['any','Any selected person or sensor is home'],['all','All selected people or sensors are home']])}
           ${this._smartInput('comfort_start','From',p.comfort_start,'time')}
@@ -31,8 +31,9 @@ export const occupancyUI = {
           ${this._smartInput('unknown_minutes','Keep last trusted occupancy (minutes)',p.unknown_minutes)}
           ${this._smartSelect('unknown_fallback','If occupancy stays unknown',p.unknown_fallback,[['schedule','Follow schedule'],['home','Treat as occupied'],['away','Treat as unoccupied']])}
         </div><p class="muted">Leave the unoccupied target empty to follow the schedule. Select a person instead of also selecting their phone trackers. Unknown sensors use the chosen grace period and fallback.</p></details>
-        <p class="muted">Manual holds, Off, boost and holiday take priority. Changes apply to this zone after saving. Disabling clears the occupied minimum; days, hours and occupancy selections are kept.</p>
-        <div class="toolbar"><button type="button" data-action="smart-save-presence" ${disabled?'disabled':''} class="primary">Save occupancy override</button><button type="button" data-action="smart-reset" ${disabled?'disabled':''}>Reload saved rules</button></div>
+        <p class="muted">A higher scheduled target is kept. Manual temperatures, Off, boost and holiday take priority. Disabling keeps your days, hours and occupancy selections.</p>
+        `,enabled?`Minimum ${this._temp(p.comfort_target??z.limits.minimum)} · ${p.comfort_start}–${p.comfort_end}`:'People, active hours and unoccupied behaviour')}
+        <div class="toolbar" data-occupancy-save ${this._smartPolicyRevisions?.[z.id]!==undefined?'':'hidden'}><button type="button" data-action="smart-save-presence" ${disabled?'disabled':''} class="primary">Save occupancy override</button><button type="button" data-action="smart-reset" ${disabled?'disabled':''}>Reload saved rules</button></div>
       </fieldset></section>`;
   },
   _occupancySummary(z, day=this._local().day) {
