@@ -25,6 +25,7 @@ test('history has real chart paths, owner explanations, range switching and disa
     click(h.root,'nav','[data-view="heatingHistory"]');
     assert.equal(h.root.querySelectorAll('.history-chart path').length,2);
     assert.match(h.root.textContent,/Why the heating changed/);
+    click(h.root,'feature-history-range','[data-hours="1"]');assert.equal(h.card._historyRange,1);
     click(h.root,'feature-history-range','[data-hours="168"]');assert.equal(h.card._historyRange,168);
     h.card._zone().insights.settings.history_enabled=false;h.card._render();assert.match(h.root.textContent,/History is disabled/);
   }finally{h.close();}
@@ -37,6 +38,18 @@ test('profiles copy selected day independently, validate targets, and preserve u
     assert.equal(h.card._zone().week.mon[0].temperature,16);
     click(h.root,'nav','[data-view="dashboard"]');assert.ok(h.root.querySelector('[role=dialog]'));click(h.root,'close');
     click(h.root,'feature-save');await settle();assert.equal(h.card._zone().insights.settings.profiles['New profile'][0].temperature,19);assert.equal(h.card._featureDraft,null);
+  }finally{h.close();}
+});
+
+test('new profile name survives a live status update before creation',async()=>{
+  const h=await setup();try{
+    click(h.root,'nav','[data-view="schedules"]');
+    const input=h.root.querySelector('[data-new-profile]');input.value='My working day';input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
+    h.card._receive(structuredClone(h.card._data));
+    assert.equal(h.root.querySelector('[data-new-profile]').value,'My working day');
+    click(h.root,'feature-create-profile');
+    assert.ok(h.card._featureDraft.settings.profiles['My working day']);
+    assert.equal(h.root.querySelector('[data-new-profile]').value,'');
   }finally{h.close();}
 });
 

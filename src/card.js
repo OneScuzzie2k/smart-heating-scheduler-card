@@ -49,6 +49,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     this.shadowRoot.addEventListener('input', event => {
       const target=event.target;
       this._featureInput(target);
+      if(target.hasAttribute('data-new-profile')){this._newProfileNames ||= {};this._newProfileNames[this._zone().id]=target.value;}
       if(target.dataset.boost==='minutes'){const out=this.shadowRoot.querySelector('[data-mini-minutes]');if(out)out.textContent=target.value+' minutes';}
       if(target.dataset.boost){this._boostInputs ||= {};const zone=target.closest('[data-smart-zone]').dataset.smartZone;this._boostInputs[zone] ||= {};this._boostInputs[zone][target.dataset.boost]=target.value;}
       if(target.dataset.smartField || target.dataset.presenceIndex!==undefined){this.shadowRoot.querySelector('[data-occupancy-save]')?.removeAttribute('hidden');this._smartPolicyRevisions ||= {};this._smartPolicyRevisions[this._zone().id] ??= this._zone().smart?.policy_revision;}
