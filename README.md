@@ -8,7 +8,19 @@ A companion Lovelace card for [Smart Heating Scheduler](https://github.com/OneSc
 
 No additional custom card, separate add-on, runtime CDN or end-user Node.js installation is required. Your thermostat's existing HA integration is still required.
 
-![Scheduler preview](docs/preview.jpg)
+## Screenshots
+
+Desktop and phone layouts from the working 0.3.0 card. These screenshots use sample data, disconnected from Home Assistant.
+
+**Desktop weekly planner**
+
+<img src="docs/screenshots/weekly-planner-desktop.jpg" alt="Dark desktop weekly heating planner with seven-day temperature timelines and a period editor" width="960">
+
+| Mobile schedule editor | Mini thermostat and boost cards |
+| --- | --- |
+| <img src="docs/screenshots/schedule-mobile.jpg" alt="Light mobile schedule editor with zone and weekday selection" width="300"> | <img src="docs/screenshots/mini-cards-mobile.jpg" alt="Two compact thermostat cards with interactive target dials, boost duration sliders and boost buttons" width="300"> |
+
+[View the full dashboard screenshot](docs/screenshots/dashboard-desktop.jpg). Choose Full scheduler or Mini thermostat & boost in the visual card editor; both use the same installed card resource.
 
 ## Install through Marketplace
 
