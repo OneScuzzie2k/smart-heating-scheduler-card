@@ -1,6 +1,6 @@
 # Smart Heating Scheduler Card
 
-**Test release 0.4.0-dev.2** adds calendar/Workday profile forms, a History tab
+**Test release 0.4.0-dev.3** adds calendar/Workday profile forms, a History tab
 with temperature and decision timelines, and optional smart-preheating settings.
 Requires backend 0.4.0.dev1 for these features. Existing mini thermostat layout is
 preserved. This is an opt-in prerelease; 0.3.0 remains the stable card release. See the backend
