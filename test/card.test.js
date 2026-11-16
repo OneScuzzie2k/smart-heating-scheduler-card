@@ -197,7 +197,7 @@ test('frost requires opt in and learning feedback is visible without cluttering 
   click(h.root,'nav','[data-view="settings"]');let input=h.root.querySelector('[data-feature="frost_enabled"]');assert.equal(input.checked,false);input.click();
   assert.equal(h.card._featureSettings().frost_target,h.card._zone().limits.minimum);
   assert.equal(h.root.querySelector('[data-feature="frost_while_off"]').checked,false);
-  click(h.root,'feature-save');await settle();assert.equal(h.card._zone().insights.settings.frost_enabled,true);
+  click(h.root,'feature-save');await settle();assert.equal(h.card._zone().insights.settings.frost_enabled,true);assert.equal(h.card._zone().insights.frost.state,'waiting');
   input=h.root.querySelector('[data-feature="preheat_enabled"]');input.click();assert.ok(h.root.querySelector('[aria-label="Preheating learning progress"]'));assert.match(h.root.textContent,/not an accuracy score/);
   h.card._data.can_edit=false;h.card._render();assert.equal(h.root.querySelector('[data-feature="frost_enabled"]').closest('fieldset').disabled,true);
  }finally{h.close();}

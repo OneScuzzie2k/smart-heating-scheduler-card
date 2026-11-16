@@ -425,6 +425,7 @@
           if (command === "insights") {
             z.insights.settings = payload.settings;
             z.insights.preheat.state = payload.settings.preheat_enabled ? "learning" : "disabled";
+            z.insights.frost = { state: payload.settings.frost_enabled ? "waiting" : "disabled", target: payload.settings.frost_target };
           }
           if (command === "clear_history") {
             z.insights.samples = [];

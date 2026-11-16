@@ -134,7 +134,7 @@ export const insightsUI={
       if(command==='insights')payload.settings=clone(this._featureDraft.settings);
       this._saving=true;this._error='';this._render();
       if(this._config.demo){
-        if(command==='insights'){z.insights.settings=payload.settings;z.insights.preheat.state=payload.settings.preheat_enabled?'learning':'disabled';}
+        if(command==='insights'){z.insights.settings=payload.settings;z.insights.preheat.state=payload.settings.preheat_enabled?'learning':'disabled';z.insights.frost={state:payload.settings.frost_enabled?'waiting':'disabled',target:payload.settings.frost_target};}
         if(command==='clear_history'){z.insights.samples=[];z.insights.decisions=[];}
         if(command==='reset_learning')z.insights.preheat={state:'learning',rate:null,samples:0,minutes:0};
         z.insights.revision++;
