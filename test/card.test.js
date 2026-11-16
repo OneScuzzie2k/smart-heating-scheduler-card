@@ -226,7 +226,7 @@ test('failed settings save remains visible beside Save across live updates and c
  const h=await setup();try{
   click(h.root,'nav','[data-view="settings"]');h.root.querySelector('[data-feature="frost_enabled"]').click();
   const input=h.root.querySelector('[data-feature="frost_target"]');input.value='12';input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
-  const server=structuredClone(h.card._data);h.card._config.demo=false;h.card._status='connected';
+  const server=structuredClone(h.card._data);h.card._error='Cannot connect to the scheduler';h.card._receive(structuredClone(server));assert.equal(h.card._error,'');h.card._config.demo=false;h.card._status='connected';
   h.card._hass={callWS:async()=>{throw Error('Target outside reviewed limits');}};
   click(h.root,'feature-save');await settle();h.card._receive(structuredClone(server));
   assert.ok(h.card._featureDraft);assert.match(h.root.querySelector('[data-feature-save-error]').textContent,/Target outside reviewed limits/);assert.match(h.root.textContent,/Save failed · changes not applied/);

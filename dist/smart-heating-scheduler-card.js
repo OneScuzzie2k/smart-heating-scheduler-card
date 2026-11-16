@@ -1244,7 +1244,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
           this._zoneId = data.zones[0]?.id;
         }
         if (this._draft && this._zone()?.revision !== this._revision) this._conflict = true;
-        if (!this._draft && !this._featureDraft) this._error = "";
+        if (!this._draft) this._error = this._featureDraft && this._featureSaveError ? this._featureSaveError : "";
       } catch (error) {
         this._error = error.message;
         this._status = "error";

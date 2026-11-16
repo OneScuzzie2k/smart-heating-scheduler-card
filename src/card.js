@@ -144,7 +144,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
         this._zoneId = data.zones[0]?.id;
       }
       if (this._draft && this._zone()?.revision !== this._revision) this._conflict = true;
-      if (!this._draft && !this._featureDraft) this._error = '';
+      if (!this._draft) this._error = this._featureDraft&&this._featureSaveError?this._featureSaveError:'';
     } catch (error) { this._error = error.message; this._status = 'error'; }
     this._render();
   }
