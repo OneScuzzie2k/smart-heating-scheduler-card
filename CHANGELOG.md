@@ -1,3 +1,10 @@
+# 0.3.0-dev.4 - compact thermostat and boost
+
+- Match the native thermostat layout with one interactive round target dial, room reading, compact boost duration and Boost/Stop boost button.
+- Remove the duplicate target slider, instruction text and permanent footer. Show Resume schedule only during a manual hold; link the title to the full scheduler.
+- Use rounded arcs and compact phone typography; clip dial-handle rotation to avoid sideways scrolling.
+- Frontend-only update, compatible with backend0.3.0.dev2. Validation:32 tests, Card/HACS checks and disconnected browser interaction plus phone/tablet layout checks.
+
 # 0.3.0-dev.3 - mini-card preview
 
 - Add an optional one-zone mini thermostat/boost layout with manual target and boost-duration sliders, native thermostat details, Resume schedule and dashboard link.

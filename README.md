@@ -1,22 +1,43 @@
-# Smart Heating Scheduler Card - Phase 3 development candidate
+# Smart Heating Scheduler Card
 
-A self-contained Lovelace custom card following the approved orange/teal designs. Rounded thermostat panels, HA-aware dark/light themes, side-by-side desktop zones and stacked mobile controls. No runtime CDN or third-party card dependency.
+A companion Lovelace card for [Smart Heating Scheduler](https://github.com/OneScuzzie2k/smart-heating-scheduler), with a full weekly planner and a compact thermostat/boost layout. Supports desktop, tablet and phone layouts, plus Home Assistant light/dark themes.
+
+**Early-access pre-release:** [card 0.3.0-dev.4](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.3.0-dev.4), compatible with [integration 0.3.0.dev2](https://github.com/OneScuzzie2k/smart-heating-scheduler/releases/tag/0.3.0.dev2). Requires **Home Assistant Core 2026.11.1 or newer**. The integration and card are installed separately.
+
+**[Full installation and setup guide](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md)** - zone setup, schedules, boost choices, occupancy, heating-control handover, updates and rollback.
+
+No additional custom card, separate add-on, runtime CDN or end-user Node.js installation is required. Your thermostat's existing HA integration is still required.
 
 ![Scheduler preview](docs/preview.jpg)
 
-## Install through HACS / Marketplace
+## Install through Marketplace
 
-Add `https://github.com/OneScuzzie2k/smart-heating-scheduler-card` as a custom **Dashboard** repository and download it. Install [the backend integration](https://github.com/OneScuzzie2k/smart-heating-scheduler) separately as an **Integration** repository. On HA 2026.11, use Settings > Marketplace. Choose the default branch for this initial development preview if no release is listed.
+1. In **Settings > Marketplace**, choose **Add from link** and add:
+   `https://github.com/OneScuzzie2k/smart-heating-scheduler-card`.
+   Check that the repository is shown as type **Dashboard**.
+2. Enable **Include pre-releases** in the repository menu. Select **0.3.0-dev.4**; use **Install another version** if needed. Install the card.
+3. Install [the backend repository](https://github.com/OneScuzzie2k/smart-heating-scheduler) separately as type **Integration**, version **0.3.0.dev2**. Follow its restart prompt. Under **Settings > Devices & services**, add **Smart Heating Scheduler (Preview)**, then **Add heating zone** for each thermostat.
+4. Allow Marketplace to register the JavaScript resource, then reload your browser or Companion App frontend. For YAML-managed resources, add the module entry shown in the install dialog. Register it once.
+5. On an editable dashboard, select **Edit dashboard > Add card > Smart Heating Scheduler**. Choose **Full scheduler** and select your scheduler from the **Scheduler** field. Save and confirm **Observe only**.
+6. Create the weekly schedules in the full card. Follow the [reviewed handover](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#6-hand-over-heating-control) when ready to enable real heating control. This is global to every enabled zone.
 
-Allow the Marketplace/HACS to register the JavaScript resource, then reload the browser. For YAML-managed resources, follow the resource path/type shown in its install dialog. Add Smart Heating Scheduler in the dashboard card picker, choose the config entry and confirm **Observe only**. No real heating command is sent in that mode.
+This project uses the HACS-compatible repository format. On the supported HA 2026.11.1+ baseline, use built-in Marketplace; older HA/HACS versions are not currently supported. These are custom repositories, with catalog inclusion and stable release still pending. A GitHub connection is required for custom repositories. See the official [Marketplace guide](https://contributors.home-assistant.io/marketplace/how-it-works/) and [dashboard resource behaviour](https://contributors.home-assistant.io/marketplace/guides/dashboard/).
 
-## Try it
+The visual editor supplies the scheduler `entry_id` automatically. To use YAML, configure a card visually and copy **Show code editor**. `entry_id` is a config-entry ID, not a climate entity ID. Leave `demo` out for connected use.
 
-Open preview.html from the development test package. It is disconnected, uses sample data and resets on reload. Try boost start/stop on Dashboard; Home/Away overrides and holiday on Automation; boost adapter settings under Settings. Advance demo clock 30 minutes on Automation to see expiry. The demo models manual overrides and timed controls; actual sensor aggregation runs in the HA backend and is covered by backend tests.
+### Manual card installation
+
+Download **smart-heating-scheduler-card.js** from the [release assets](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.3.0-dev.4). Copy it to `<config>/www/smart-heating-scheduler-card.js` and register `/local/smart-heating-scheduler-card.js` as a **JavaScript module** dashboard resource (`type: module` for a YAML resource list). Reload the frontend. The backend must also be installed; see its [manual installation instructions](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#manual-installation).
+
+For updates, reload all frontends after replacing the card. A card-only update needs no HA restart. Use one installation method/resource entry so multiple versions are not loaded together.
+
+### If the card does not appear
+
+Check the Dashboard package is installed, the resource is registered as a module once, and the frontend has been reloaded. If no scheduler/zones load, complete backend setup and choose Scheduler in the editor. Check logs and the user's mapped-climate permissions. The backend setup entry is currently named **Heating Scheduler Preview**, even when heating control is enabled.
 
 ## Working controls
 
-Mini card: choose **Mini thermostat & boost** in the visual card editor, then select a scheduler and heating zone. The compact layout follows Home Assistant's thermostat: a round interactive dial, current room temperature, boost-time slider and one Boost/Stop boost button. The dial is the only target-temperature control. Drag its handle or tap its arc; releasing sends one manual-target change. Arrow keys adjust by one temperature step; Home/End choose the bounds. A cancelled drag sends nothing. A small Resume schedule control appears during a manual override. Tap the title to open the configured full dashboard, or the three-dot button for the native thermostat. Test the disconnected example at `/mini` on the local demo server.
+Mini card: choose **Mini thermostat & boost** in the visual card editor, then select a scheduler and the exact heating zone. Add one mini card per zone; set Full scheduler dashboard path to your own dashboard path if desired. The compact layout follows Home Assistant's thermostat: a round interactive dial, current room temperature, boost-time slider and one Boost/Stop boost button. The dial is the only target-temperature control. Drag its handle or tap its arc; releasing sends one manual-target change. Arrow keys adjust by one temperature step; Home/End choose the bounds. A cancelled drag sends nothing. A small Resume schedule control appears during a manual override. Tap the title to open the configured full dashboard, or the three-dot button for the native thermostat. Test the disconnected example at `/mini` on the local demo server.
 
 ```yaml
 type: custom:smart-heating-scheduler-card
@@ -42,7 +63,7 @@ Enabled rules appear alongside today's schedule and the phone day editor, with a
 - Adapter settings for built-in boost or fixed-target external scripts, timer, optional helper and filtered completion event.
 - Connected mode shows Observe only or Heating control explicitly. Admin mutation controls and policy revisions are enforced by the backend.
 
-Use Settings > Heating control mode only in a reviewed test environment. Enabling it permits real climate/script/helper calls; it requires the exact acknowledgement shown in the UI. It is disabled in the disconnected demo. Test the browser preview without changing live HA.
+New installations remain in observe-only mode until an administrator completes the handover. Settings > Heating control mode requires the exact acknowledgement shown in the UI and enables commands for all enabled zones. Device availability, manual Off and control priorities still apply. The disconnected demo cannot enable real heating control.
 
 ## Development
 
@@ -53,7 +74,7 @@ npm test
 npm run demo
 ```
 
-Local demo: http://127.0.0.1:18765/. Distribution bundle: dist/smart-heating-scheduler-card.js. The same compiled custom element is used in the preview and HA.
+Local full demo: http://127.0.0.1:18765/; mini demo: http://127.0.0.1:18765/mini. These use sample data, reset on reload and send no heating commands. Distribution bundle: dist/smart-heating-scheduler-card.js. End users install the already built release asset; the commands above are for contributors.
 
 ```yaml
 type: custom:smart-heating-scheduler-card
@@ -65,4 +86,4 @@ view: dashboard
 
 The visual card editor selects entry/title/theme/view. Leave demo out for connected data. Browser clocks are for display only; the backend owns real deadlines and commands. No HA URL/token or home mapping is embedded in sample previews.
 
-Full HA browser installation, physical devices, screen readers, 200% zoom, broader themes and translations still require release validation. Development source is prepared for public GitHub custom-repository installation; it is not a catalog-listed stable release or a production deployment. MIT licensed. Bulk holiday scope and defaults/inheritance remain follow-up work; current smart rules are independent per zone.
+Marketplace installation, manual targets/resume, boost start/cancel and occupancy activation have been exercised on a supervised two-zone setup. Additional thermostat models, automatic expiry/restart/holiday field acceptance, screen readers, 200% zoom, broader themes and translations remain release work. MIT licensed. Bulk holiday scope and defaults/inheritance remain follow-up work; current smart rules are independent per zone.
