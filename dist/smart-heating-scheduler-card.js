@@ -121,8 +121,110 @@
     };
   }
 
+  // src/transfer-ui.js
+  function scheduleBackup(zone) {
+    return { format: "smart-heating-scheduler/schedule", version: 1, name: zone.name, unit: zone.unit, week: clone(zone.week) };
+  }
+  function parseBackup(text, zone) {
+    if (typeof text !== "string" || text.length > 15e4) throw Error("Choose a schedule backup smaller than 150 KB.");
+    const data = JSON.parse(text);
+    if (!data || !["smart-heating-scheduler/schedule", "smart-heating-scheduler/zone"].includes(data.format) || data.version !== 1) throw Error("Unsupported schedule backup format or version.");
+    if (data.unit !== zone.unit) throw Error("Temperature units differ. Automatic conversion is not supported.");
+    validateWeek(data.week, zone.limits);
+    return clone(data.week);
+  }
+  var transferUI = {
+    _transferPanel() {
+      const disabled = !this._canEdit() || this._saving;
+      return this._disclosure("transfer", "Schedule backup & copying", `<p class="muted">Download this zone\u2019s saved week, import a backup into a draft, or copy another zone\u2019s week. Import and copy change nothing until you review and save the week. Week backups contain schedules only. Zone settings backups also contain occupancy and boost mappings, profiles, history preferences, preheating and frost options. Restore zone settings only into a disabled zone after reviewing the JSON. Thermostat mappings, limits, control mode, active overrides, history and learned data are never imported. Use Home Assistant backups for full recovery.</p><div class="toolbar"><button data-action="transfer-export" ${disabled ? "disabled" : ""}>Export saved week</button><button data-action="transfer-export-zone" ${disabled ? "disabled" : ""}>Export zone settings</button><button data-action="transfer-import" ${disabled ? "disabled" : ""}>Import week</button><button data-action="copy-week" ${disabled || this._data.zones.filter((z) => z.id !== this._zone().id && z.unit === this._zone().unit).length === 0 ? "disabled" : ""}>Copy from another zone</button></div>`, "Download, preview an import or copy between zones");
+    },
+    async _transferAction(action) {
+      if (!this._canEdit() || this._saving) return;
+      if (action === "export" || action === "export-zone") {
+        const blob = new Blob([JSON.stringify(action === "export-zone" ? { ...scheduleBackup(this._zone()), format: "smart-heating-scheduler/zone", policy: clone(this._zone().smart.policy), features: clone(this._zone().insights.settings) } : scheduleBackup(this._zone()), null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob), link = document.createElement("a");
+        link.href = url;
+        link.download = action === "export-zone" ? "heating-zone-settings.json" : "heating-schedule.json";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1e3);
+        return;
+      }
+      if (action === "import") {
+        this._guard(() => {
+          this._dialog = { kind: "import-week", text: "", week: null, zone: this._zone().id, revision: this._zone().revision, featuresRevision: this._zone().insights?.revision, policyRevision: this._zone().smart?.policy_revision };
+          this._dialogError = "";
+          this._focusDialog = true;
+          this._render();
+        });
+        return;
+      }
+      if (action === "preview") {
+        try {
+          this._dialog.week = parseBackup(this._dialog.text, this._zone());
+          const data = JSON.parse(this._dialog.text);
+          this._dialog.configuration = data.format === "smart-heating-scheduler/zone" ? data : null;
+          this._dialog.ack = false;
+          this._dialogError = "";
+        } catch (error) {
+          this._dialog.week = null;
+          this._dialog.configuration = null;
+          this._dialogError = error.message;
+        }
+        this._render();
+        return;
+      }
+      if (action === "restore" && this._dialog?.configuration) {
+        const z = this._zone(), d = this._dialog;
+        if (z.enabled || !d.ack) {
+          this._dialogError = "Disable the destination zone and acknowledge the settings review first.";
+          this._render();
+          return;
+        }
+        this._saving = true;
+        this._error = "";
+        this._render();
+        try {
+          if (this._config.demo) {
+            if (z.revision !== d.revision || z.insights.revision !== d.featuresRevision || z.smart.policy_revision !== d.policyRevision) throw Error("Zone changed elsewhere; reopen import.");
+            z.week = clone(d.configuration.week);
+            z.smart.policy = clone(d.configuration.policy);
+            z.insights.settings = clone(d.configuration.features);
+            z.revision++;
+            z.insights.revision++;
+            z.smart.policy_revision++;
+          } else this._data = await this._hass.callWS({ type: "smart_heating_scheduler/control", entry_id: this._config.entry_id, zone_id: z.id, action: "restore_configuration", payload: { backup: d.configuration, revision: d.revision, features_revision: d.featuresRevision, policy_revision: d.policyRevision, acknowledgement: "RESTORE ZONE SETTINGS" } });
+          this._dialog = null;
+          this._message = "Zone settings restored. The zone remains disabled; review its schedule and settings before enabling it.";
+        } catch (error) {
+          this._dialogError = error.message || "Restore failed. Keep the zone disabled and inspect the settings before retrying.";
+        } finally {
+          this._saving = false;
+          this._render();
+        }
+        return;
+      }
+      if (action === "apply" && this._dialog?.week) {
+        if (this._zone().id !== this._dialog.zone || this._zone().revision !== this._dialog.revision) {
+          this._dialogError = "The destination schedule changed. Close and reopen import to review the latest version.";
+          this._render();
+          return;
+        }
+        const week = this._dialog.week;
+        this._dialog = null;
+        this._view = "schedules";
+        this._mutate(week);
+        this._message = "Imported into a draft. Review the week, then Save week to apply it.";
+        this._render();
+      }
+    },
+    _importDialog() {
+      const d = this._dialog;
+      return `<p>Import into <strong>${escapeHTML(this._zone().name)}</strong>. Choose an exported JSON file or paste its contents. No heating changes occur in this preview.</p><label>Schedule backup file<input type="file" accept=".json,application/json" data-import-file aria-label="Schedule backup file"></label><label>Backup JSON<textarea data-import-text aria-label="Backup JSON" rows="5">${escapeHTML(d.text)}</textarea></label>${this._dialogError ? `<div class="error" role="alert">${escapeHTML(this._dialogError)}</div>` : ""}${d.week ? `<div class="success" role="status">Validated for ${escapeHTML(this._zone().unit)} and this zone\u2019s limits. ${Object.values(d.week).reduce((n, p) => n + p.length, 0)} periods across seven days.</div><div class="import-preview">${Object.entries(d.week).map(([day, periods]) => `<div><b>${escapeHTML(day)}</b> ${periods.map((p) => `${escapeHTML(p.start)} \xB7 ${escapeHTML(p.temperature)}${escapeHTML(this._zone().unit)}`).join(" / ")}</div>`).join("")}</div>` : ""}${d.configuration ? `<p class="muted">This file also includes zone settings and entity references. Read the JSON above and check every boost script, timer and occupancy input. The thermostat mapping, reviewed limits and control mode stay unchanged.</p><label class="check"><input type="checkbox" data-import-ack ${d.ack ? "checked" : ""}>I reviewed all settings and entity mappings for this destination</label>${this._zone().enabled ? '<p class="error">Disable this zone in Manage thermostat and limits before restoring its settings.</p>' : ""}<button data-action="transfer-restore" class="primary" ${this._zone().enabled || !d.ack || this._saving ? "disabled" : ""}>Restore zone settings</button>` : ""}<div class="toolbar"><button data-action="close">Cancel</button><button data-action="transfer-preview">Validate & preview</button><button class="primary" data-action="transfer-apply" ${d.week ? "" : "disabled"}>Load into draft</button></div>`;
+    }
+  };
+
   // src/insights-ui.js
-  var featureDefaults = () => ({ profiles: {}, workday_entity: "", workday_profile: "", non_workday_profile: "", calendar_rules: [], preheat_enabled: false, preheat_max_minutes: 90, preheat_margin_minutes: 5, history_enabled: true });
+  var featureDefaults = () => ({ frost_enabled: false, frost_target: null, frost_while_off: false, frost_hysteresis: 0.5, frost_max_age_minutes: 60, profiles: {}, workday_entity: "", workday_profile: "", non_workday_profile: "", calendar_rules: [], preheat_enabled: false, preheat_max_minutes: 90, preheat_margin_minutes: 5, history_enabled: true });
   var btn = (label, action, disabled = false, attrs = "") => `<button type="button" data-action="feature-${action}" ${disabled ? "disabled" : ""} ${attrs}>${escapeHTML(label)}</button>`;
   function demoInsights(zone, now) {
     const settings = featureDefaults();
@@ -149,6 +251,7 @@
       if (!target.dataset.feature) return;
       const s = this._featureEdit();
       if (!s) return;
+      if (target.dataset.feature === "frost_enabled" && target.checked && s.frost_target == null) s.frost_target = this._zone().limits.minimum;
       const key = target.dataset.feature;
       const value = target.type === "checkbox" ? target.checked : target.type === "number" ? Number(target.value) : target.value;
       if (target.dataset.profileRow !== void 0) {
@@ -172,7 +275,7 @@
       if (!f) return "";
       const state = f.preheat?.state;
       const text = state === "preheating" ? `Preheating \xB7 ready by ${this._formatTime(f.preheat.ready_at)}` : state === "learning" && f.settings.preheat_enabled ? "Smart preheating \xB7 Learning" : null;
-      return `<div class="feature-summary"><span class="profile-tag">\u25A6 ${escapeHTML(f.active_profile || "Weekly schedule")}</span>${text ? `<span class="preheat-tag">\u2600 ${escapeHTML(text)}</span>` : ""}</div>${f.warnings?.length ? `<div class="error" role="status">${f.warnings.map(escapeHTML).join("<br>")}</div>` : ""}`;
+      return `<div class="feature-summary">${["active", "proposed", "returning_off"].includes(f.frost?.state) ? `<span class="profile-tag">\u2744 Frost protection \xB7 ${escapeHTML(f.frost.state)}</span>` : ""}<span class="profile-tag">\u25A6 ${escapeHTML(f.active_profile || "Weekly schedule")}</span>${text ? `<span class="preheat-tag">\u2600 ${escapeHTML(text)}</span>` : ""}</div>${f.warnings?.length ? `<div class="error" role="status">${f.warnings.map(escapeHTML).join("<br>")}</div>` : ""}`;
     },
     _profilesPanel() {
       const z = this._zone(), s = this._featureSettings();
@@ -191,13 +294,25 @@
       const dirty = Boolean(this._featureDraft);
       return `<div class="draft-bar" data-feature-savebar ${dirty ? "" : "hidden"}><span data-feature-dirty class="${dirty ? "dirty" : "muted"}">${dirty ? "\u25CF Unsaved settings" : "Settings saved"}</span><div class="toolbar">${btn("Reload saved", "reload", !this._canEdit() || this._saving)}${btn(this._saving ? "Saving\u2026" : "Save settings", "save", !dirty || !this._canEdit() || this._saving, 'class="primary"')}</div></div>`;
     },
+    _frostSettings() {
+      const z = this._zone(), s = this._featureSettings();
+      if (!s) return "";
+      const disabled = !this._canEdit() || this._saving, state = z.insights.frost?.state || "disabled";
+      return `<section class="smart-feature"><div class="scope">${escapeHTML(z.name)} \xB7 zone setting</div><p class="muted">An optional minimum for cold rooms. Requires Home Assistant, heating control and an available thermostat. Keep hardware protection enabled independently.</p><fieldset ${disabled ? "disabled" : ""}><label class="occupancy-toggle"><input type="checkbox" data-feature="frost_enabled" aria-label="Enable frost protection" ${s.frost_enabled ? "checked" : ""}>Enable frost protection</label><div class="feature-status">${escapeHTML({ disabled: "Disabled", waiting: "Waiting \xB7 minimum armed", active: "Frost heating active", proposed: "Frost heating proposed \xB7 observe only", paused_off: "Paused \xB7 thermostat is Off", unavailable: "Waiting for a fresh thermostat reading", returning_off: "Restoring the original Off state" }[state] || state)}</div><div ${s.frost_enabled ? "" : "hidden"}>${this._featureField("frost_target", "Frost minimum (" + z.unit + ")", s.frost_target ?? z.limits.minimum, "number", `min="${z.limits.minimum}" max="${z.limits.maximum}" step="${z.limits.step || "any"}"`)}<p class="muted">Must fit the reviewed zone limits (${escapeHTML(z.limits.minimum)}\u2013${escapeHTML(z.limits.maximum)} ${escapeHTML(z.unit)}). Change limits deliberately in Manage thermostat and limits if needed; they are never lowered automatically.</p><label class="check"><input type="checkbox" data-feature="frost_while_off" ${s.frost_while_off ? "checked" : ""}>Allow temporary frost heating while thermostat is Off</label><p class="muted">Off is respected by default. If allowed, the thermostat returns to Off after warming by the recovery margin. The temporary heat target is the frost minimum plus the recovery margin, rounded up with one extra thermostat increment so it can warm past the release threshold. It must fit the reviewed limits. Higher targets and boost ownership are preserved. Missing or old readings never count as cold.</p>${this._disclosure("frost-options", "Advanced options", this._featureField("frost_hysteresis", "Recovery margin (" + z.unit + ")", s.frost_hysteresis ?? 0.5, "number", 'min="0.1" max="3" step="0.1"') + this._featureField("frost_max_age_minutes", "Maximum thermostat report age (minutes)", s.frost_max_age_minutes ?? 60, "number", 'min="5" max="180" step="1"'), "Recovery margin and reading age")}</div></fieldset>${this._featureSaveBar()}</section>`;
+    },
+    _learningFeedback() {
+      const z = this._zone(), p = z.insights?.preheat || {};
+      if (!this._featureSettings()?.preheat_enabled) return "";
+      const progress = Math.max(0, Math.min(100, p.learning_percent ?? Math.min((p.samples || 0) / 12, (p.minutes || 0) / 60) * 100));
+      return `<progress class="learning-progress" max="100" value="${progress}" aria-label="Preheating learning progress"></progress><p class="muted">${escapeHTML(p.samples || 0)} of 12 accepted observations \xB7 ${Math.round(p.minutes || 0)} of 60 heating minutes. This is a minimum learning threshold, not an accuracy score.</p>${p.estimated_minutes != null ? `<div class="fact-row"><span>Estimated warm-up</span><b>${escapeHTML(p.estimated_minutes)} minutes</b></div>` : ""}${p.starts_at ? `<div class="fact-row"><span>Planned early start</span><b>${escapeHTML(this._formatTime(p.starts_at))}</b></div>` : ""}${p.last_result ? `<p class="muted">Last measured warm-up: ${p.last_result.on_time ? "at target by its scheduled time" : "below target at its scheduled time"} (${escapeHTML(p.last_result.room)} / ${escapeHTML(p.last_result.target)} ${escapeHTML(z.unit)}). Recorded near the boundary; this is a measured result, not a guarantee.</p>` : ""}`;
+    },
     _preheatSettings() {
       const z = this._zone(), s = this._featureSettings();
       if (!s) return "";
       const p = z.insights.preheat || {}, disabled = !this._canEdit() || this._saving;
       const status = !s.preheat_enabled ? "Disabled" : { learning: "Learning your zone", paused: "Paused by another rule", ready: "Ready for the next warm-up", preheating: "Preheating", no_temperature: "Waiting for room temperature" }[p.state] || "Learning your zone";
       const advanced = `<div class="form-grid">${this._featureField("preheat_margin_minutes", "Extra warm-up margin (minutes)", s.preheat_margin_minutes, "number", 'min="0" max="30" step="1"')}</div><div class="fact-row"><span>Accepted observations</span><b>${escapeHTML(p.samples || 0)} \xB7 ${Math.round(p.minutes || 0)} min</b></div><div class="fact-row"><span>Measured warm-up rate</span><b>${p.rate ? `${Number(p.rate).toFixed(2)} ${escapeHTML(z.unit)}/hour` : "Learning"}</b></div><p class="muted">Learning needs at least 12 measured increases covering an hour of heating. Old learning expires after 14 days without useful readings.</p>${btn("Reset learning", "reset-learning", disabled)}`;
-      return `<section class="panel smart-feature"><div class="scope">${escapeHTML(z.name)} \xB7 zone setting</div><h2>Smart preheating</h2><p class="muted">Learn how this zone warms up, and start early enough to aim for its scheduled temperature.</p><fieldset ${disabled ? "disabled" : ""}><label class="occupancy-toggle"><input type="checkbox" aria-label="Enable smart preheating for this zone" data-feature="preheat_enabled" ${s.preheat_enabled ? "checked" : ""}>Enable smart preheating</label><div class="feature-status"><span class="dot" aria-hidden="true"></span>${escapeHTML(status)}${s.preheat_enabled && p.state === "preheating" ? ` \xB7 ready by ${escapeHTML(this._formatTime(p.ready_at))}` : ""}</div><div class="preheat-options" ${s.preheat_enabled ? "" : "hidden"}>${this._featureField("preheat_max_minutes", "Maximum early start (minutes)", s.preheat_max_minutes, "number", 'min="5" max="180" step="1"')}<p class="muted">Off, manual temperatures, boosts, holidays and Away still take priority.</p>${this._disclosure("preheat-options", "Advanced options", advanced, "Warm-up margin, measurements and reset")}</div></fieldset>${this._featureSaveBar()}</section>`;
+      return `<section class="panel smart-feature"><div class="scope">${escapeHTML(z.name)} \xB7 zone setting</div><h2>Smart preheating</h2><p class="muted">Learn how this zone warms up, and start early enough to aim for its scheduled temperature.</p><fieldset ${disabled ? "disabled" : ""}><label class="occupancy-toggle"><input type="checkbox" aria-label="Enable smart preheating for this zone" data-feature="preheat_enabled" ${s.preheat_enabled ? "checked" : ""}>Enable smart preheating</label><div class="feature-status"><span class="dot" aria-hidden="true"></span>${escapeHTML(status)}${s.preheat_enabled && p.state === "preheating" ? ` \xB7 ready by ${escapeHTML(this._formatTime(p.ready_at))}` : ""}</div>${this._learningFeedback()}<div class="preheat-options" ${s.preheat_enabled ? "" : "hidden"}>${this._featureField("preheat_max_minutes", "Maximum early start (minutes)", s.preheat_max_minutes, "number", 'min="5" max="180" step="1"')}<p class="muted">Off, manual temperatures, boosts, holidays and Away still take priority.</p>${this._disclosure("preheat-options", "Advanced options", advanced, "Warm-up margin, measurements and reset")}</div></fieldset>${this._featureSaveBar()}</section>`;
     },
     _heatingHistory() {
       const z = this._zone(), f = z.insights;
@@ -393,6 +508,8 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
 .settings-stack>.settings-grid>.occupancy-settings{grid-column:auto}.settings-stack>.settings-grid{align-items:stretch}
 
 .zone-management{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.add-zone-link{border:1px solid var(--shs-line);border-radius:12px;padding:9px 14px;min-height:44px;text-decoration:none;font-size:13px;font-weight:600;background:var(--shs-panel)}.zone-help{font-size:12px;margin:-2px 0 16px}@container(max-width:650px){.zone-management{display:grid;grid-template-columns:1fr}.zone-management .add-zone-link{justify-content:center}.zone-help{margin:0 0 16px}}
+
+.learning-progress{width:100%;height:8px;accent-color:var(--shs-teal)}textarea{width:100%;box-sizing:border-box;max-width:100%;border:1px solid var(--shs-line);border-radius:10px;background:var(--shs-panel2);color:var(--shs-ink);padding:12px}.import-preview{max-height:220px;overflow:auto;font-size:12px;line-height:1.8;overflow-wrap:anywhere}.modal .toolbar{flex-wrap:wrap}.modal{max-width:calc(100cqw - 32px)}.modal input[type=file]{max-width:100%;min-width:0}
 `;
 
   // src/occupancy-ui.js
@@ -823,7 +940,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
   // src/card.js
   var DOMAIN = "smart_heating_scheduler";
   var VIEWS = { dashboard: ["\u2302", "Dashboard"], schedules: ["\u25A6", "Schedules"], automation: ["\u25F7", "Automation"], heatingHistory: ["\u2197", "History"], settings: ["\u2699", "Settings"] };
-  var SOURCES = { preheat: "Smart preheating", boost: "Timed boost", holiday: "Holiday", away: "Away target", occupied_comfort: "Occupancy override", boost_handover: "Boost handover needs review", schedule: "Following schedule", manual: "Manual override", manual_off: "Manual off", off: "Thermostat off", external_boost: "External boost", boost_unknown: "Boost status unknown", unavailable: "Thermostat unavailable", unsupported: "Review thermostat capabilities", disabled: "Scheduler disabled", error: "Review required" };
+  var SOURCES = { frost: "Frost minimum", frost_return_off: "Returning to Off", preheat: "Smart preheating", boost: "Timed boost", holiday: "Holiday", away: "Away target", occupied_comfort: "Occupancy override", boost_handover: "Boost handover needs review", schedule: "Following schedule", manual: "Manual override", manual_off: "Manual off", off: "Thermostat off", external_boost: "External boost", boost_unknown: "Boost status unknown", unavailable: "Thermostat unavailable", unsupported: "Review thermostat capabilities", disabled: "Scheduler disabled", error: "Review required" };
   var button = (label, action, attrs = "", cls = "") => `<button type="button" data-action="${action}" class="${cls}" ${attrs}>${escapeHTML(label)}</button>`;
   var SmartHeatingSchedulerCard = class extends HTMLElement {
     constructor() {
@@ -855,6 +972,35 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       });
       this.shadowRoot.addEventListener("change", (event) => {
         const target = event.target;
+        if (target.hasAttribute("data-import-ack") && this._dialog?.kind === "import-week") {
+          this._dialog.ack = target.checked;
+          this._render();
+          return;
+        }
+        if (target.hasAttribute("data-import-file") && this._dialog?.kind === "import-week") {
+          const dialog = this._dialog, file = target.files?.[0];
+          if (file) {
+            if (file.size > 15e4) {
+              this._dialogError = "Choose a file smaller than 150 KB.";
+              this._render();
+              return;
+            }
+            file.text().then((text) => {
+              if (this._dialog !== dialog) return;
+              dialog.text = text;
+              dialog.week = null;
+              dialog.configuration = null;
+              dialog.ack = false;
+              this._render();
+            }).catch(() => {
+              if (this._dialog === dialog) {
+                this._dialogError = "Could not read that file.";
+                this._render();
+              }
+            });
+          }
+          return;
+        }
         if (target.dataset.smartField || target.dataset.presenceIndex !== void 0) target.dispatchEvent(new Event("input", { bubbles: true }));
         if (target.dataset.comfortDay) {
           this.shadowRoot.querySelector("[data-occupancy-save]")?.removeAttribute("hidden");
@@ -870,7 +1016,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
           const rule = [...this.shadowRoot.querySelectorAll("details[data-disclosure]")].find((el) => el.dataset.disclosure.endsWith(":occupancy-rule"));
           if (rule) rule.open = target.checked;
         }
-        if (target.dataset.smartField === "comfort_enabled" || target.dataset.feature === "preheat_enabled") this._render();
+        if (target.dataset.smartField === "comfort_enabled" || ["preheat_enabled", "frost_enabled"].includes(target.dataset.feature)) this._render();
         if (target.dataset.action === "feature-profile-select") {
           this._profileName = target.value;
           this._render();
@@ -887,6 +1033,12 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       this.shadowRoot.addEventListener("input", (event) => {
         const target = event.target;
         this._featureInput(target);
+        if (target.hasAttribute("data-import-text") && this._dialog?.kind === "import-week") {
+          this._dialog.text = target.value;
+          this._dialog.week = null;
+          this._dialog.configuration = null;
+          this._dialog.ack = false;
+        }
         if (target.hasAttribute("data-new-profile")) {
           this._newProfileNames ||= {};
           this._newProfileNames[this._zone().id] = target.value;
@@ -1182,6 +1334,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
     }
     _action(action, data = {}) {
+      if (action.startsWith("transfer-")) {
+        void this._transferAction(action.slice(9));
+        return;
+      }
       if (action.startsWith("feature-")) {
         void this._featureAction(action.slice(8), data);
         return;
@@ -1380,13 +1536,16 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       const z = this._zone();
       const zoneDetails = `<div class="fact-row"><span>Thermostat</span><b>${escapeHTML(z.climate_entity || "Sample thermostat")}</b></div><div class="fact-row"><span>Reviewed limits</span><b>${escapeHTML(this._temp(z.limits.minimum))} \u2013 ${escapeHTML(this._temp(z.limits.maximum))}</b></div><div class="fact-row"><span>Temperature step</span><b>${z.limits.step ? escapeHTML(this._temp(z.limits.step)) : "Not reported"}</b></div><div class="fact-row"><span>Manual temperature</span><b>${escapeHTML({ next_period: "Until next period", duration: `${z.manual_minutes} minutes`, until_resume: "Until resumed" }[z.manual_policy])}</b></div>${!this._config.demo && this._data.can_edit ? '<a class="shs-link" href="/config/integrations/integration/smart_heating_scheduler">Manage thermostat and limits \u2192</a>' : ""}`;
       const appearance = `<section class="panel"><h3>Card appearance</h3><label>Theme<select data-action="theme-select" aria-label="Card theme">${["auto", "dark", "light"].map((t) => `<option value="${t}" ${this._config.theme === t ? "selected" : ""}>${{ auto: "Follow Home Assistant", dark: "Dark", light: "Light" }[t]}</option>`).join("")}</select></label></section>`;
-      return `<div class="zone-picker"><div><div class="eyebrow">Make this zone work for you</div><h2>Settings</h2></div><div class="zone-management">${this._selector()}${this._addZoneShortcut()}</div></div><p class="zone-help muted">Add a zone for each thermostat in Home Assistant, then choose it here.</p><div class="settings-stack">${this._disclosure("zone", "Zone settings", zoneDetails, `${z.name} \xB7 thermostat, limits and manual override`)}<div class="settings-section-title"><h3>Smart features</h3><p class="muted">Optional features for this zone. Open a feature to adjust its options.</p></div><div class="settings-grid">${this._occupancySettings()}${this._preheatSettings()}</div>${this._disclosure("advanced", "Advanced settings", `<div class="settings-grid">${this._smartSettings()}${appearance}</div>`, "Boost adapters, heating control mode and appearance")}</div>`;
+      return `<div class="zone-picker"><div><div class="eyebrow">Make this zone work for you</div><h2>Settings</h2></div><div class="zone-management">${this._selector()}${this._addZoneShortcut()}</div></div><p class="zone-help muted">Add a zone for each thermostat in Home Assistant, then choose it here.</p><div class="settings-stack">${this._disclosure("setup-guide", "Guided zone setup", '<ol><li>Choose a thermostat and zone name.</li><li>Review its temperature limits and starting all-day schedule.</li><li>Choose boost, occupancy, preheating and frost options.</li><li>Review the summary. New zones start disabled; enable them after reviewing their schedule.</li></ol><p class="muted">Use Add heating zone above, then Guided setup. Existing zones keep their current settings.</p>', "Four steps for adding a thermostat")}${this._disclosure("zone", "Zone settings", zoneDetails, `${z.name} \xB7 thermostat, limits and manual override`)}<div class="settings-section-title"><h3>Smart features</h3><p class="muted">Optional features for this zone. Open a feature to adjust its options.</p></div><div class="settings-grid">${this._occupancySettings()}${this._preheatSettings()}</div>${this._disclosure("frost", "Frost protection", this._frostSettings(), this._zone().insights?.settings.frost_enabled ? "Enabled for this zone" : "Optional minimum temperature \xB7 disabled")}${this._transferPanel()}${this._disclosure("advanced", "Advanced settings", `<div class="settings-grid">${this._smartSettings()}${appearance}</div>`, "Boost adapters, heating control mode and appearance")}</div>`;
     }
     _modal() {
       if (!this._dialog) return "";
       const dialog = this._dialog;
       let content = "", title = "";
-      if (dialog.kind === "holiday-boost") {
+      if (dialog.kind === "import-week") {
+        title = "Import schedule";
+        content = this._importDialog();
+      } else if (dialog.kind === "holiday-boost") {
         title = "Timed holiday exception";
         content = `<p>Start this timed boost during the holiday? The holiday target resumes when it ends.</p><div class="toolbar">${button("Cancel", "close")}${button("Start timed exception", "holiday-boost-confirm", "", "primary")}</div>`;
       } else if (dialog.kind === "reconcile") {
@@ -1412,7 +1571,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       return `<div class="modal-shade"><section class="modal" role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}"><div class="section-head"><h2>${escapeHTML(title)}</h2>${button("\xD7", "close", 'aria-label="Close dialog"', "link-button")}</div>${content}</section></div>`;
     }
     _trapFocus(event) {
-      const controls = [...this.shadowRoot.querySelectorAll(".modal button:not(:disabled),.modal input:not(:disabled),.modal select")];
+      const controls = [...this.shadowRoot.querySelectorAll(".modal button:not(:disabled),.modal input:not(:disabled),.modal select,.modal textarea")];
       if (!controls.length) return;
       const active = this.shadowRoot.activeElement, first = controls[0], last = controls.at(-1);
       if (event.shiftKey && active === first) {
@@ -1454,7 +1613,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
     }
   };
-  Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, insightsUI);
+  Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, insightsUI, transferUI);
   var SmartHeatingSchedulerCardEditor = class extends HTMLElement {
     constructor() {
       super();

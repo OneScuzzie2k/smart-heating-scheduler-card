@@ -171,3 +171,44 @@ test('policy forms retain draft values across incoming snapshots and reject stal
 test('read-only users have all smart mutations disabled',async()=>{const h=await setup();try{h.card._data.can_edit=false;h.card._render();assert.equal(h.root.querySelector('[data-action="smart-boost-start"]').disabled,true);click(h.root,'nav','[data-view="automation"]');assert.equal(h.root.querySelector('[data-action="smart-save-presence"]').disabled,true);await h.card._smartAction('presence-away',{});assert.equal(h.card._zone().smart.override,null);}finally{h.close();}});
 
 test('presence entity editor keeps explicit state mappings',async()=>{const h=await setup();try{h.card._hass={states:{'person.example':{attributes:{friendly_name:'Example person'}}}};click(h.root,'nav','[data-view="automation"]');click(h.root,'smart-add-person');const picker=h.root.querySelector('[data-presence-key="entity_id"]');picker.value='person.example';picker.dispatchEvent(new h.dom.window.Event('change',{bubbles:true}));click(h.root,'smart-save-presence');await settle();assert.deepEqual(Array.from(h.card._zone().smart.policy.entities,x=>({...x})),[{entity_id:'person.example',home_state:'home',away_state:'not_home'}]);}finally{h.close();}});
+
+
+test('schedule import validates a preview and never saves until Save week',async()=>{
+ const h=await setup();try{
+  click(h.root,'nav','[data-view="settings"]');click(h.root,'transfer-import');
+  const backup={format:'smart-heating-scheduler/schedule',version:1,unit:'°C',week:structuredClone(h.card._zone().week)};backup.week.mon[0].temperature=18;
+  const input=h.root.querySelector('[data-import-text]');input.value=JSON.stringify(backup);input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
+  click(h.root,'transfer-preview');assert.equal(h.card._zone().week.mon[0].temperature,16);assert.match(h.root.textContent,/Validated/);
+  click(h.root,'transfer-apply');assert.equal(h.card._draft.mon[0].temperature,18);assert.equal(h.card._zone().week.mon[0].temperature,16);
+  click(h.root,'save');await settle();assert.equal(h.card._zone().week.mon[0].temperature,18);
+ }finally{h.close();}
+});
+test('schedule import rejects incompatible units, out of bounds and stale destinations',async()=>{
+ const h=await setup();try{
+  await h.card._transferAction('import');
+  const data={format:'smart-heating-scheduler/schedule',version:1,unit:'°F',week:structuredClone(h.card._zone().week)};
+  h.card._dialog.text=JSON.stringify(data);await h.card._transferAction('preview');assert.match(h.root.textContent,/units differ/);assert.equal(h.card._dialog.week,null);
+  data.unit='°C';data.week.mon[0].temperature=100;h.card._dialog.text=JSON.stringify(data);await h.card._transferAction('preview');assert.equal(h.card._dialog.week,null);
+  data.week.mon[0].temperature=18;h.card._dialog.text=JSON.stringify(data);await h.card._transferAction('preview');h.card._zone().revision++;await h.card._transferAction('apply');assert.match(h.root.textContent,/destination schedule changed/);assert.equal(h.card._draft,null);
+ }finally{h.close();}
+});
+test('frost requires opt in and learning feedback is visible without cluttering mini cards',async()=>{
+ const h=await setup();try{
+  click(h.root,'nav','[data-view="settings"]');let input=h.root.querySelector('[data-feature="frost_enabled"]');assert.equal(input.checked,false);input.click();
+  assert.equal(h.card._featureSettings().frost_target,h.card._zone().limits.minimum);
+  assert.equal(h.root.querySelector('[data-feature="frost_while_off"]').checked,false);
+  click(h.root,'feature-save');await settle();assert.equal(h.card._zone().insights.settings.frost_enabled,true);
+  input=h.root.querySelector('[data-feature="preheat_enabled"]');input.click();assert.ok(h.root.querySelector('[aria-label="Preheating learning progress"]'));assert.match(h.root.textContent,/not an accuracy score/);
+  h.card._data.can_edit=false;h.card._render();assert.equal(h.root.querySelector('[data-feature="frost_enabled"]').closest('fieldset').disabled,true);
+ }finally{h.close();}
+});
+
+test('zone settings restore requires disabled destination and explicit mapping acknowledgement',async()=>{
+ const h=await setup();try{
+  const z=h.card._zone();await h.card._transferAction('import');
+  h.card._dialog.text=JSON.stringify({format:'smart-heating-scheduler/zone',version:1,unit:z.unit,week:z.week,policy:z.smart.policy,features:{...z.insights.settings,preheat_enabled:true}});
+  await h.card._transferAction('preview');assert.ok(h.card._dialog.configuration);
+  await h.card._transferAction('restore');assert.match(h.root.textContent,/Disable the destination/);assert.equal(z.insights.settings.preheat_enabled,false);
+  z.enabled=false;h.card._dialog.ack=true;await h.card._transferAction('restore');assert.equal(z.insights.settings.preheat_enabled,true);assert.equal(z.enabled,false);assert.equal(h.card._dialog,null);
+ }finally{h.close();}
+});

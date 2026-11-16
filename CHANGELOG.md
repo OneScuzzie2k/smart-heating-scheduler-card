@@ -1,3 +1,11 @@
+# 0.5.0 — setup, frost, backups and preheating feedback
+
+- Guided zone setup guidance and HA wizard entry point.
+- Collapsed, optional frost settings with reviewed target, Off permission and recovery/freshness controls.
+- Download weekly schedules or zone settings; validate and preview files before importing. Full settings restoration keeps the destination disabled.
+- Copy saved weeks between compatible zones; show learning progress, warm-up estimates and last measured result.
+- Keep existing mini thermostat/boost layout unchanged. Requires integration 0.5.0 for new backend controls.
+
 # 0.3.0 - first stable release
 
 - Promote the tested dev.5 frontend with the full responsive planner, per-zone occupancy/holiday/boost controls and compact thermostat/boost mini card.

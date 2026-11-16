@@ -1,4 +1,5 @@
 import {DAYS, DAY_NAMES, clone, escapeHTML as e, minutes, validateWeek, editPeriod, addPeriod, deletePeriod, copyDay, localParts, periodIndex, demoSnapshot, remainingText} from './model.js';
+import {transferUI} from './transfer-ui.js';
 import {insightsUI, demoInsights} from './insights-ui.js';
 import {styles} from './styles.js';
 import {occupancyUI} from './occupancy-ui.js';
@@ -7,7 +8,7 @@ import {smartUI, defaultSmart, resolveDemo} from './smart-ui.js';
 
 const DOMAIN = 'smart_heating_scheduler';
 const VIEWS = {dashboard:['⌂','Dashboard'], schedules:['▦','Schedules'], automation:['◷','Automation'], heatingHistory:['↗','History'], settings:['⚙','Settings']};
-const SOURCES = {preheat:'Smart preheating',boost:'Timed boost', holiday:'Holiday', away:'Away target', occupied_comfort:'Occupancy override', boost_handover:'Boost handover needs review', schedule:'Following schedule', manual:'Manual override', manual_off:'Manual off', off:'Thermostat off', external_boost:'External boost', boost_unknown:'Boost status unknown', unavailable:'Thermostat unavailable', unsupported:'Review thermostat capabilities', disabled:'Scheduler disabled', error:'Review required'};
+const SOURCES = {frost:'Frost minimum',frost_return_off:'Returning to Off',preheat:'Smart preheating',boost:'Timed boost', holiday:'Holiday', away:'Away target', occupied_comfort:'Occupancy override', boost_handover:'Boost handover needs review', schedule:'Following schedule', manual:'Manual override', manual_off:'Manual off', off:'Thermostat off', external_boost:'External boost', boost_unknown:'Boost status unknown', unavailable:'Thermostat unavailable', unsupported:'Review thermostat capabilities', disabled:'Scheduler disabled', error:'Review required'};
 const button = (label, action, attrs = '', cls = '') => `<button type="button" data-action="${action}" class="${cls}" ${attrs}>${e(label)}</button>`;
 
 export class SmartHeatingSchedulerCard extends HTMLElement {
@@ -28,6 +29,11 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     });
     this.shadowRoot.addEventListener('change', event => {
       const target = event.target;
+      if(target.hasAttribute('data-import-ack')&&this._dialog?.kind==='import-week'){this._dialog.ack=target.checked;this._render();return;}
+      if(target.hasAttribute('data-import-file')&&this._dialog?.kind==='import-week'){
+        const dialog=this._dialog,file=target.files?.[0];
+        if(file){if(file.size>150000){this._dialogError='Choose a file smaller than 150 KB.';this._render();return;}file.text().then(text=>{if(this._dialog!==dialog)return;dialog.text=text;dialog.week=null;dialog.configuration=null;dialog.ack=false;this._render();}).catch(()=>{if(this._dialog===dialog){this._dialogError='Could not read that file.';this._render();}});}return;
+      }
       if(target.dataset.smartField || target.dataset.presenceIndex!==undefined)target.dispatchEvent(new Event('input',{bubbles:true}));
       if(target.dataset.comfortDay){
         this.shadowRoot.querySelector('[data-occupancy-save]')?.removeAttribute('hidden');
@@ -38,7 +44,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
         input.comfort_days=DAYS.filter(day=>selected.has(day)).join(',');
       }
       if(target.dataset.smartField==='comfort_enabled'){const rule=[...this.shadowRoot.querySelectorAll('details[data-disclosure]')].find(el=>el.dataset.disclosure.endsWith(':occupancy-rule'));if(rule)rule.open=target.checked;}
-      if(target.dataset.smartField==='comfort_enabled'||target.dataset.feature==='preheat_enabled')this._render();
+      if(target.dataset.smartField==='comfort_enabled'||['preheat_enabled','frost_enabled'].includes(target.dataset.feature))this._render();
       if(target.dataset.action==='feature-profile-select'){this._profileName=target.value;this._render();}
       if (target.dataset.action === 'zone-select') this._guard(() => this._selectZone(target.value));
       if (target.dataset.action === 'theme-select') { this._config.theme = target.value; this._render(); }
@@ -49,6 +55,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     this.shadowRoot.addEventListener('input', event => {
       const target=event.target;
       this._featureInput(target);
+      if(target.hasAttribute('data-import-text')&&this._dialog?.kind==='import-week'){this._dialog.text=target.value;this._dialog.week=null;this._dialog.configuration=null;this._dialog.ack=false;}
       if(target.hasAttribute('data-new-profile')){this._newProfileNames ||= {};this._newProfileNames[this._zone().id]=target.value;}
       if(target.dataset.boost==='minutes'){const out=this.shadowRoot.querySelector('[data-mini-minutes]');if(out)out.textContent=target.value+' minutes';}
       if(target.dataset.boost){this._boostInputs ||= {};const zone=target.closest('[data-smart-zone]').dataset.smartZone;this._boostInputs[zone] ||= {};this._boostInputs[zone][target.dataset.boost]=target.value;}
@@ -194,6 +201,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     } finally { this._saving = false; this._render(); }
   }
   _action(action, data = {}) {
+    if(action.startsWith('transfer-')){void this._transferAction(action.slice(9));return;}
     if(action.startsWith('feature-')){void this._featureAction(action.slice(8),data);return;}
     if(action==='occupancy-settings'){this._guard(()=>{this._selectZone(data.zone);this._view='settings';this._render();});return;}
     if(action.startsWith('smart-')){void this._smartAction(action.slice(6),data);return;}
@@ -283,12 +291,13 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     const z=this._zone();
     const zoneDetails=`<div class="fact-row"><span>Thermostat</span><b>${e(z.climate_entity||'Sample thermostat')}</b></div><div class="fact-row"><span>Reviewed limits</span><b>${e(this._temp(z.limits.minimum))} – ${e(this._temp(z.limits.maximum))}</b></div><div class="fact-row"><span>Temperature step</span><b>${z.limits.step?e(this._temp(z.limits.step)):'Not reported'}</b></div><div class="fact-row"><span>Manual temperature</span><b>${e({next_period:'Until next period',duration:`${z.manual_minutes} minutes`,until_resume:'Until resumed'}[z.manual_policy])}</b></div>${!this._config.demo&&this._data.can_edit?'<a class="shs-link" href="/config/integrations/integration/smart_heating_scheduler">Manage thermostat and limits →</a>':''}`;
     const appearance=`<section class="panel"><h3>Card appearance</h3><label>Theme<select data-action="theme-select" aria-label="Card theme">${['auto','dark','light'].map(t=>`<option value="${t}" ${this._config.theme===t?'selected':''}>${{auto:'Follow Home Assistant',dark:'Dark',light:'Light'}[t]}</option>`).join('')}</select></label></section>`;
-    return `<div class="zone-picker"><div><div class="eyebrow">Make this zone work for you</div><h2>Settings</h2></div><div class="zone-management">${this._selector()}${this._addZoneShortcut()}</div></div><p class="zone-help muted">Add a zone for each thermostat in Home Assistant, then choose it here.</p><div class="settings-stack">${this._disclosure('zone','Zone settings',zoneDetails,`${z.name} · thermostat, limits and manual override`)}<div class="settings-section-title"><h3>Smart features</h3><p class="muted">Optional features for this zone. Open a feature to adjust its options.</p></div><div class="settings-grid">${this._occupancySettings()}${this._preheatSettings()}</div>${this._disclosure('advanced','Advanced settings',`<div class="settings-grid">${this._smartSettings()}${appearance}</div>`,'Boost adapters, heating control mode and appearance')}</div>`;
+    return `<div class="zone-picker"><div><div class="eyebrow">Make this zone work for you</div><h2>Settings</h2></div><div class="zone-management">${this._selector()}${this._addZoneShortcut()}</div></div><p class="zone-help muted">Add a zone for each thermostat in Home Assistant, then choose it here.</p><div class="settings-stack">${this._disclosure('setup-guide','Guided zone setup','<ol><li>Choose a thermostat and zone name.</li><li>Review its temperature limits and starting all-day schedule.</li><li>Choose boost, occupancy, preheating and frost options.</li><li>Review the summary. New zones start disabled; enable them after reviewing their schedule.</li></ol><p class="muted">Use Add heating zone above, then Guided setup. Existing zones keep their current settings.</p>','Four steps for adding a thermostat')}${this._disclosure('zone','Zone settings',zoneDetails,`${z.name} · thermostat, limits and manual override`)}<div class="settings-section-title"><h3>Smart features</h3><p class="muted">Optional features for this zone. Open a feature to adjust its options.</p></div><div class="settings-grid">${this._occupancySettings()}${this._preheatSettings()}</div>${this._disclosure('frost','Frost protection',this._frostSettings(),this._zone().insights?.settings.frost_enabled?'Enabled for this zone':'Optional minimum temperature · disabled')}${this._transferPanel()}${this._disclosure('advanced','Advanced settings',`<div class="settings-grid">${this._smartSettings()}${appearance}</div>`,'Boost adapters, heating control mode and appearance')}</div>`;
   }
   _modal() {
     if (!this._dialog) return '';
     const dialog = this._dialog; let content = '', title = '';
-    if (dialog.kind === 'holiday-boost') {
+    if (dialog.kind === 'import-week') {title='Import schedule';content=this._importDialog();}
+    else if (dialog.kind === 'holiday-boost') {
       title='Timed holiday exception';content=`<p>Start this timed boost during the holiday? The holiday target resumes when it ends.</p><div class="toolbar">${button('Cancel','close')}${button('Start timed exception','holiday-boost-confirm','','primary')}</div>`;
     } else if(dialog.kind==='reconcile'){
       title='Confirm external boost restoration';content=`<p>Only confirm after checking that the stop script has finished restoring the receiver and the external timer is idle.</p><div class="toolbar">${button('Cancel','close')}${button('Restoration completed','smart-confirm-reconcile','','primary')}</div>`;
@@ -308,7 +317,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     return `<div class="modal-shade"><section class="modal" role="dialog" aria-modal="true" aria-label="${e(title)}"><div class="section-head"><h2>${e(title)}</h2>${button('×','close','aria-label="Close dialog"','link-button')}</div>${content}</section></div>`;
   }
   _trapFocus(event) {
-    const controls = [...this.shadowRoot.querySelectorAll('.modal button:not(:disabled),.modal input:not(:disabled),.modal select')];
+    const controls = [...this.shadowRoot.querySelectorAll('.modal button:not(:disabled),.modal input:not(:disabled),.modal select,.modal textarea')];
     if (!controls.length) return;
     const active=this.shadowRoot.activeElement, first=controls[0],last=controls.at(-1);
     if (event.shiftKey && active===first) { event.preventDefault(); last.focus(); }
@@ -334,7 +343,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
   }
 }
 
-Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, insightsUI);
+Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, insightsUI, transferUI);
 
 export class SmartHeatingSchedulerCardEditor extends HTMLElement {
   constructor() { super(); this.attachShadow({mode:'open'}); this._entries=[]; this.shadowRoot.addEventListener('change',event=>{const key=event.target.dataset.config; if(!key)return; this._config={...this._config,[key]:event.target.value};if(key==='entry_id'){delete this._config.zone_id;this._zoneEntry=null;}this._loadZones();this._render(); this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));}); }
