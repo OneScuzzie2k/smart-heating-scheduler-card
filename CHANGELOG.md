@@ -1,3 +1,9 @@
+# 0.3.0-dev.5 - keep mini cards aligned
+
+- Show active occupancy as a small person/Occupied badge in the dial's existing bottom gap.
+- Position occupancy, holiday and manual-resume status outside normal layout flow so state changes do not change thermostat height or move boost controls.
+- No heating-control, schedule or backend changes. Compatible with backend 0.3.0.dev2.
+
 # 0.3.0-dev.4 - compact thermostat and boost
 
 - Match the native thermostat layout with one interactive round target dial, room reading, compact boost duration and Boost/Stop boost button.

@@ -35,8 +35,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
 .mini-dial .dial-thumb{position:absolute;inset:0;transform:rotate(calc(225deg + var(--fill)*1deg));pointer-events:none}
 .mini-dial .dial-thumb:after{content:'';position:absolute;left:calc(50% - 7px);top:calc(7.5% - 7px);width:14px;height:14px;border:2px solid var(--mini-accent);border-radius:50%;background:var(--shs-panel)}
 .mini:not(.idle){--mini-ring:#ff9c5c}
-.mini-state,.mini-resume{display:block;margin:0 auto;font-size:11px;color:var(--shs-muted);line-height:1.2}
-.mini-resume{border:0;background:transparent;padding:5px 6px;min-height:32px;text-decoration:underline}
+.mini-state,.mini-resume{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);margin:0;font-size:11px;line-height:1.2;white-space:nowrap}
+.mini-state{display:flex;align-items:center;gap:4px;padding:3px 7px;border-radius:12px;color:var(--shs-teal);background:color-mix(in srgb,var(--shs-teal) 8%,var(--shs-panel));pointer-events:none}
+.mini-state svg{width:11px;height:11px;flex:none}
+.mini-resume{color:var(--shs-muted);border:0;background:transparent;padding:5px 6px;min-height:32px;text-decoration:underline}
 .mini-boost{margin-top:8px;padding:8px 10px 2px}
 .mini-slider{display:block;margin:0;color:var(--shs-ink);font-size:14px;line-height:1.3}
 .mini-boost-label{display:flex;align-items:center;gap:9px}

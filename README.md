@@ -2,7 +2,7 @@
 
 A companion Lovelace card for [Smart Heating Scheduler](https://github.com/OneScuzzie2k/smart-heating-scheduler), with a full weekly planner and a compact thermostat/boost layout. Supports desktop, tablet and phone layouts, plus Home Assistant light/dark themes.
 
-**Early-access pre-release:** [card 0.3.0-dev.4](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.3.0-dev.4), compatible with [integration 0.3.0.dev2](https://github.com/OneScuzzie2k/smart-heating-scheduler/releases/tag/0.3.0.dev2). Requires **Home Assistant Core 2026.11.1 or newer**. The integration and card are installed separately.
+**Early-access pre-release:** [card 0.3.0-dev.5](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.3.0-dev.5), compatible with [integration 0.3.0.dev2](https://github.com/OneScuzzie2k/smart-heating-scheduler/releases/tag/0.3.0.dev2). Requires **Home Assistant Core 2026.11.1 or newer**. The integration and card are installed separately.
 
 **[Full installation and setup guide](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md)** - zone setup, schedules, boost choices, occupancy, heating-control handover, updates and rollback.
 
@@ -15,7 +15,7 @@ No additional custom card, separate add-on, runtime CDN or end-user Node.js inst
 1. In **Settings > Marketplace**, choose **Add from link** and add:
    `https://github.com/OneScuzzie2k/smart-heating-scheduler-card`.
    Check that the repository is shown as type **Dashboard**.
-2. Enable **Include pre-releases** in the repository menu. Select **0.3.0-dev.4**; use **Install another version** if needed. Install the card.
+2. Enable **Include pre-releases** in the repository menu. Select **0.3.0-dev.5**; use **Install another version** if needed. Install the card.
 3. Install [the backend repository](https://github.com/OneScuzzie2k/smart-heating-scheduler) separately as type **Integration**, version **0.3.0.dev2**. Follow its restart prompt. Under **Settings > Devices & services**, add **Smart Heating Scheduler (Preview)**, then **Add heating zone** for each thermostat.
 4. Allow Marketplace to register the JavaScript resource, then reload your browser or Companion App frontend. For YAML-managed resources, add the module entry shown in the install dialog. Register it once.
 5. On an editable dashboard, select **Edit dashboard > Add card > Smart Heating Scheduler**. Choose **Full scheduler** and select your scheduler from the **Scheduler** field. Save and confirm **Observe only**.
@@ -27,7 +27,7 @@ The visual editor supplies the scheduler `entry_id` automatically. To use YAML, 
 
 ### Manual card installation
 
-Download **smart-heating-scheduler-card.js** from the [release assets](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.3.0-dev.4). Copy it to `<config>/www/smart-heating-scheduler-card.js` and register `/local/smart-heating-scheduler-card.js` as a **JavaScript module** dashboard resource (`type: module` for a YAML resource list). Reload the frontend. The backend must also be installed; see its [manual installation instructions](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#manual-installation).
+Download **smart-heating-scheduler-card.js** from the [release assets](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.3.0-dev.5). Copy it to `<config>/www/smart-heating-scheduler-card.js` and register `/local/smart-heating-scheduler-card.js` as a **JavaScript module** dashboard resource (`type: module` for a YAML resource list). Reload the frontend. The backend must also be installed; see its [manual installation instructions](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#manual-installation).
 
 For updates, reload all frontends after replacing the card. A card-only update needs no HA restart. Use one installation method/resource entry so multiple versions are not loaded together.
 
