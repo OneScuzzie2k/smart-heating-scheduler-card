@@ -50,10 +50,11 @@ test('round dial supports keyboard steps and bounds while keeping keyboard focus
   }finally{h.close();}
 });
 
-test('mini card isolates the chosen zone, target slider and shared boost controls',async()=>{
+test('mini card has one temperature dial, isolates the chosen zone and shares boost controls',async()=>{
   const h=await setup({demo:true,layout:'mini',zone_id:'lounge',theme:'light'});try{
     assert.equal(h.root.querySelector('nav'),null);assert.match(h.root.querySelector('h2').textContent,/Lounge/);assert.equal(h.card.getGridOptions().columns,6);
-    const target=h.root.querySelector('[data-mini-target]');target.value='22';target.dispatchEvent(new h.dom.window.Event('change',{bubbles:true}));await settle();assert.equal(h.card._data.zones[1].device_target,22);assert.equal(h.card._data.zones[0].device_target,20);
+    assert.equal(h.root.querySelector('[data-mini-target]'),null);assert.equal(h.root.querySelectorAll('[role=slider]').length,1);
+    const target=h.root.querySelector('[data-mini-dial]');target.dispatchEvent(new h.dom.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));await settle();assert.equal(h.card._data.zones[1].device_target,20.5);assert.equal(h.card._data.zones[0].device_target,20);
     click(h.root,'smart-boost-start','[data-zone="lounge"]');await settle();assert.ok(h.card._data.zones[1].smart.boost);assert.equal(h.card._data.zones[0].smart.boost,null);click(h.root,'smart-boost-cancel','[data-zone="lounge"]');await settle();assert.equal(h.card._data.zones[1].smart.boost,null);
   }finally{h.close();}
 });

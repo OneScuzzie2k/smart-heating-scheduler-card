@@ -27,7 +27,6 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     });
     this.shadowRoot.addEventListener('change', event => {
       const target = event.target;
-      if(target.hasAttribute('data-mini-target')){void this._miniSetTarget(target.value);return;}
       if(target.dataset.smartField || target.dataset.presenceIndex!==undefined)target.dispatchEvent(new Event('input',{bubbles:true}));
       if(target.dataset.comfortDay){
         this._smartInputs ||= {}; const input=this._smartInputs[this._zone().id] ||= {};
@@ -44,7 +43,6 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     });
     this.shadowRoot.addEventListener('input', event => {
       const target=event.target;
-      if(target.hasAttribute('data-mini-target'))this._previewMiniTarget(Number(target.value));
       if(target.dataset.boost==='minutes'){const out=this.shadowRoot.querySelector('[data-mini-minutes]');if(out)out.textContent=target.value+' minutes';}
       if(target.dataset.boost){this._boostInputs ||= {};const zone=target.closest('[data-smart-zone]').dataset.smartZone;this._boostInputs[zone] ||= {};this._boostInputs[zone][target.dataset.boost]=target.value;}
       if(target.dataset.smartField || target.dataset.presenceIndex!==undefined){this._smartPolicyRevisions ||= {};this._smartPolicyRevisions[this._zone().id] ??= this._zone().smart?.policy_revision;}

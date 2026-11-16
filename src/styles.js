@@ -12,9 +12,43 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
 .occupancy-settings{grid-column:1/-1}.occupancy-toggle{display:flex;align-items:center;gap:12px;margin-bottom:18px;font-weight:600;color:var(--shs-ink)}.occupancy-toggle input{width:22px;height:22px;accent-color:var(--shs-teal)}.occupancy-days{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0}.occupancy-days legend{margin-bottom:9px;font-size:12px;color:var(--shs-muted)}.occupancy-days label{display:flex;align-items:center;gap:6px;border:1px solid var(--shs-line);border-radius:10px;padding:9px;min-height:44px}.occupancy-days input{width:18px;height:18px;accent-color:var(--shs-teal)}.occupancy-advanced{margin:18px 0}.occupancy-advanced summary{cursor:pointer;min-height:44px;padding:12px 0;color:var(--shs-teal)}.occupancy-summary{background:color-mix(in srgb,var(--shs-teal) 7%,var(--shs-panel));border:1px solid color-mix(in srgb,var(--shs-teal) 35%,var(--shs-line));border-radius:14px;padding:14px;margin:14px 0}.occupancy-summary-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.occupancy-summary.active{border-color:var(--shs-teal)}.occupancy-summary p{margin:8px 0;font-size:12px;color:var(--shs-muted)}.occupancy-summary .badge{flex:none}.occupancy-track{height:9px;background:var(--shs-panel2);border-radius:6px;margin-top:7px;overflow:hidden}.occupancy-track span{display:block;height:100%;border-radius:6px;border:1px dashed var(--shs-teal);background:color-mix(in srgb,var(--shs-teal) 35%,transparent)}
 @container(max-width:650px){.occupancy-summary-head{align-items:flex-start;flex-direction:column}.occupancy-days label{flex:1 0 20%;justify-content:center}}
 
-.mini{padding:16px;background:var(--shs-panel);border:1px solid var(--shs-line);border-radius:18px}.mini .section-head{margin-bottom:4px}.mini h2{font-size:17px}:host([theme=light]){color-scheme:light}.mini-mode{color:var(--shs-muted);font-size:11px;margin-bottom:12px}.mini .ring{max-width:165px;margin-bottom:8px}.mini .reading{font-size:32px}.mini-slider{display:block;margin:8px 0;color:var(--shs-muted);font-size:12px}.mini-slider input[type=range]{display:block;width:100%;min-height:28px;padding:0;border:0;accent-color:var(--shs-orange-fill);background:transparent}.mini-slider output{float:right;color:var(--shs-ink)}.mini-boost{margin-top:15px;border-top:1px solid var(--shs-line)}.mini-occupancy{color:var(--shs-teal);font-size:11px;margin:12px 0}.mini .toolbar{justify-content:space-between;margin-top:12px}.mini .toolbar button,.mini .toolbar a{font-size:11px}.mini .boost-controls button{font-size:12px}
-
-.mini-slider input[type=range]{appearance:none;-webkit-appearance:none;cursor:pointer}.mini-slider input[type=range]::-webkit-slider-runnable-track{height:8px;background:var(--shs-track);border-radius:6px}.mini-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--shs-orange-fill);margin-top:-6px;box-shadow:0 1px 3px #0003}.mini-slider input[type=range]::-moz-range-track{height:8px;background:var(--shs-track);border-radius:6px}.mini-slider input[type=range]::-moz-range-thumb{width:16px;height:16px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--shs-orange-fill)}
-
-.mini-dial{touch-action:none;user-select:none;cursor:grab;border-radius:50%}.mini-dial:active{cursor:grabbing}.mini-dial[aria-disabled=true]{cursor:default;opacity:.7}.mini-dial:focus-visible{outline:3px solid var(--shs-teal);outline-offset:7px}.mini-dial .dial-thumb{position:absolute;inset:0;transform:rotate(calc(225deg + var(--fill)*1deg));pointer-events:none}.mini-dial .dial-thumb:after{content:'';position:absolute;left:calc(50% - 8px);top:-2px;width:16px;height:16px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--shs-orange-fill);box-shadow:0 1px 4px #0004}.idle .mini-dial .dial-thumb:after{background:var(--shs-teal)}.dial-hint{display:block;text-align:center;color:var(--shs-muted);font-size:11px;margin:0 0 10px}
+/* Compact thermostat matches the native HA card; the dial is the only target control. */
+.mini{position:relative;color:var(--shs-ink);min-width:0;--mini-accent:#ff8a45;--mini-ring:#ffba94;--mini-track:light-dark(#ebebeb,#35424b)}
+.mini-thermostat,.mini-boost{background:var(--ha-card-background,var(--shs-panel));border:1px solid var(--divider-color,var(--shs-line));border-radius:var(--ha-card-border-radius,12px)}
+.mini-thermostat{padding:4px 8px 8px;text-align:center;position:relative}
+.mini-head{height:44px;display:flex;align-items:center;position:relative;justify-content:center;padding:0 24px}
+.mini h2{font-size:16px;line-height:1.25;font-weight:400;letter-spacing:0;text-align:center}
+.mini h2 a{color:inherit;text-decoration:none}
+.mini-more{position:absolute;right:-8px;top:0;border:0;background:transparent;padding:0;width:36px;min-height:44px;color:var(--shs-muted);font-size:25px;font-weight:400}
+.mini .ring{max-width:240px;width:100%;margin:4px auto -14px;aspect-ratio:1;gap:5px}
+.mini .ring:before{display:none}
+.mini-arc{position:absolute;width:100%;height:100%;inset:0;pointer-events:none;overflow:visible}
+.mini-arc circle{fill:none;stroke-width:14;stroke-linecap:round;transform:rotate(135deg);transform-origin:100px 100px}
+.mini-arc .arc-track{stroke:var(--mini-track)}.mini-arc .arc-value{stroke:var(--mini-ring)}
+.mini .reading{font-size:40px;line-height:1.15;font-weight:400;letter-spacing:-1px}
+.mini-caption{font-size:15px;font-weight:500;line-height:1.3}
+.mini-room{display:flex;align-items:center;justify-content:center;gap:3px;font-size:15px;line-height:1.4}
+.mini-room svg{width:14px;height:16px;flex:none}
+.mini-dial{overflow:clip;touch-action:none;user-select:none;cursor:grab;border-radius:50%}
+.mini-dial:active{cursor:grabbing}.mini-dial[aria-disabled=true]{cursor:default}
+.mini-dial:focus-visible{outline:2px solid var(--mini-accent);outline-offset:0}
+.mini-dial .dial-thumb{position:absolute;inset:0;transform:rotate(calc(225deg + var(--fill)*1deg));pointer-events:none}
+.mini-dial .dial-thumb:after{content:'';position:absolute;left:calc(50% - 7px);top:calc(7.5% - 7px);width:14px;height:14px;border:2px solid var(--mini-accent);border-radius:50%;background:var(--shs-panel)}
+.mini:not(.idle){--mini-ring:#ff9c5c}
+.mini-state,.mini-resume{display:block;margin:0 auto;font-size:11px;color:var(--shs-muted);line-height:1.2}
+.mini-resume{border:0;background:transparent;padding:5px 6px;min-height:32px;text-decoration:underline}
+.mini-boost{margin-top:8px;padding:8px 10px 2px}
+.mini-slider{display:block;margin:0;color:var(--shs-ink);font-size:14px;line-height:1.3}
+.mini-boost-label{display:flex;align-items:center;gap:9px}
+.mini-timer{width:34px;height:34px;display:grid;place-items:center;flex:none;border-radius:50%;background:light-dark(#d4e9fa,#29445c);color:var(--shs-muted);font-size:25px}
+.mini-slider output{display:block;font-size:11px;margin-top:2px}
+.mini-slider input[type=range]{appearance:none;-webkit-appearance:none;cursor:pointer;display:block;width:100%;min-height:40px;padding:0;border:0;accent-color:var(--mini-accent);background:transparent;margin:3px 0 0}
+.mini-slider input[type=range]::-webkit-slider-runnable-track{height:10px;background:var(--mini-track);border-radius:8px}
+.mini-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--mini-accent);margin-top:-4px;box-shadow:0 1px 2px #0002}
+.mini-slider input[type=range]::-moz-range-track{height:10px;background:var(--mini-track);border-radius:8px}
+.mini-slider input[type=range]::-moz-range-thumb{width:14px;height:14px;border:2px solid var(--shs-panel);border-radius:50%;background:var(--mini-accent)}
+.mini-boost-button{display:flex;align-items:center;justify-content:center;gap:6px;margin:8px auto 0;background:var(--ha-card-background,var(--shs-panel));border:1px solid var(--divider-color,var(--shs-line));border-radius:24px;padding:7px 15px;min-height:40px;font-size:12px;font-weight:500;color:var(--shs-ink)}
+.mini-boost-button svg{width:15px;height:15px;color:#f34c38;flex:none}
+.mini-sr{position:absolute;left:0;top:0;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@container(max-width:220px){.mini h2{font-size:14px}.mini .reading{font-size:32px}.mini-caption,.mini-room{font-size:13px}.mini .ring{gap:4px}.mini-head{padding:0 17px}.mini-thermostat{padding:4px 4px 8px}.mini-slider{font-size:13px}.mini-boost{padding:8px 8px 2px}.mini-boost-label{gap:7px}.mini-timer{width:30px;height:30px}}
 `;

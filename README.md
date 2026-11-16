@@ -16,7 +16,7 @@ Open preview.html from the development test package. It is disconnected, uses sa
 
 ## Working controls
 
-Mini-card preview: choose **Mini thermostat & boost** in the visual card editor, then select a scheduler and heating zone. Drag the circular thermostat handle or tap the arc to preview a temperature; releasing sends one manual-target change. Arrow keys adjust by one temperature step; Home/End choose the bounds. A cancelled drag sends nothing. The target slider remains available as an alternative. The mini layout also has the room reading, boost-time slider, shared boost start/stop, Resume schedule and an optional link to the full dashboard. It uses the same resource and integration. Test the disconnected example at `/mini` on the local demo server.
+Mini card: choose **Mini thermostat & boost** in the visual card editor, then select a scheduler and heating zone. The compact layout follows Home Assistant's thermostat: a round interactive dial, current room temperature, boost-time slider and one Boost/Stop boost button. The dial is the only target-temperature control. Drag its handle or tap its arc; releasing sends one manual-target change. Arrow keys adjust by one temperature step; Home/End choose the bounds. A cancelled drag sends nothing. A small Resume schedule control appears during a manual override. Tap the title to open the configured full dashboard, or the three-dot button for the native thermostat. Test the disconnected example at `/mini` on the local demo server.
 
 ```yaml
 type: custom:smart-heating-scheduler-card
@@ -28,7 +28,7 @@ dashboard_path: /your-heating-dashboard
 theme: auto
 ```
 
-The mini target slider sends the native thermostat temperature action only when live control is enabled, the zone is available and no boost/holiday handover is active. The backend observes it as a manual target change under the zone's configured hold policy. It never switches on an Off thermostat implicitly. Use Resume schedule explicitly. Boosts use the existing backend API, ownership guards and helper duration constraints. Preview code is under review before replacing any existing Overview cards.
+The mini dial sends the native thermostat temperature action only when live control is enabled, the zone is available and no boost/holiday handover is active. The backend observes it as a manual target change under the zone's configured hold policy. It never switches on an Off thermostat implicitly. Use the native thermostat or full scheduler to turn heating on from Off. Boosts use the existing backend API, ownership guards and helper duration constraints.
 
 **Occupancy override** is a per-zone setting under Settings (also available on Automation). Enable it, choose an occupied minimum, people or occupancy sensors, active weekdays and hours, then save. It raises a lower scheduled target while occupied; a higher scheduled target is retained. Manual holds, Off, boost and holiday keep their priority. Disabling clears the minimum; occupancy selections, days and hours remain.
 
