@@ -1,4 +1,4 @@
-# 0.5.1 — independent frost range (prepared, not yet released)
+# 0.5.1 — independent frost range and clear save errors
 
 - Frost target input uses the backend’s verified hardware range instead of the normal schedule minimum.
 - Explain that normal schedule/manual bounds remain unchanged; requires backend 0.5.1 for the independent range.
