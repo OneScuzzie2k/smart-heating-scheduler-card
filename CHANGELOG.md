@@ -1,3 +1,9 @@
+# 0.3.0 - first stable release
+
+- Promote the tested dev.5 frontend with the full responsive planner, per-zone occupancy/holiday/boost controls and compact thermostat/boost mini card.
+- Keep the single interactive target dial and fixed-height occupancy badge; no layout or heating-command changes from dev.5.
+- Update installation instructions to the stable 0.3.0 backend/card pair. Requires Home Assistant Core 2026.11.1+. See backend release acceptance for live expiry, holiday and restart results and external timer requirements.
+
 # 0.3.0-dev.5 - keep mini cards aligned
 
 - Show active occupancy as a small person/Occupied badge in the dial's existing bottom gap.
