@@ -1,3 +1,9 @@
+# 0.5.2 — clear preheating priority and pause reasons
+
+- Show the actual pause reason supplied by the backend.
+- Explain that presence alone does not pause scheduled preheating; occupancy adds a minimum.
+- Requires integration 0.5.2 for the corrected control policy. Existing settings and mini-card layout preserved.
+
 # 0.5.1 — independent frost range and clear save errors
 
 - Frost target input uses the backend’s verified hardware range instead of the normal schedule minimum.

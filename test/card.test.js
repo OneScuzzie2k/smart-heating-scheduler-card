@@ -234,3 +234,10 @@ test('failed settings save remains visible beside Save across live updates and c
   assert.equal(h.card._featureDraft,null);assert.equal(h.root.querySelector('[data-feature-save-error]'),null);assert.match(h.root.textContent,/Zone features updated/);
  }finally{h.close();}
 });
+
+test('preheating shows the actual pause reason and explains presence independence',async()=>{
+ const h=await setup();try{
+  const z=h.card._zone();z.insights.settings.preheat_enabled=true;z.insights.preheat.state='paused';z.insights.preheat.pause_reason='Holiday is active';
+  click(h.root,'nav','[data-view="settings"]');assert.match(h.root.textContent,/Holiday is active/);assert.match(h.root.textContent,/Presence alone does not pause/);
+ }finally{h.close();}
+});
