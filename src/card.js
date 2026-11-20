@@ -326,7 +326,10 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
   }
   _render() {
     if (!this._config) return;
-    if(this._dialDrag)return; // Keep pointer capture while incoming snapshots update data.
+    if(this._dialDrag){
+      if(this._miniCanSet(this._miniZone()))return; // Keep capture only while editing remains allowed.
+      this._dialDrag=null;this._miniTarget=null;
+    }
     this._applyTheme();
     this._disclosures ||= {};
     for(const details of this.shadowRoot.querySelectorAll('details[data-disclosure]'))this._disclosures[details.dataset.disclosure]=details.open;

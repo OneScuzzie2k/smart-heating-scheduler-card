@@ -1,3 +1,10 @@
+# 0.5.4 — lock boost temperatures clearly
+
+- Disable full-card boost target/duration inputs during a running boost and show its active target. Stop boost remains available.
+- Mini dial shows “Boost · locked” in its existing caption. Incoming boost snapshots cancel an in-progress dial drag immediately without sending a manual target.
+- Native HA thermostat controls and physical device buttons keep their existing behavior, including Off.
+- 48 frontend/model/DOM tests pass. Works with integration 0.5.3; frontend-only update, no Core restart required.
+
 # 0.5.3 — boost for household users
 
 - Full and mini boost controls use server-supplied per-zone permissions instead of requiring administrator access.

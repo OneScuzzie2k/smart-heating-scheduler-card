@@ -263,3 +263,33 @@ test('household users can boost in full and mini cards without editing settings 
     }finally{h.close();}
   }
 });
+
+
+test('running boost locks the full-card target and duration while Stop stays available',async()=>{
+  const h=await setup();try{
+    const box=h.root.querySelector('[data-smart-zone="bedroom"]');box.querySelector('[data-boost="target"]').value='24';
+    click(h.root,'smart-boost-start','[data-zone="bedroom"]');await settle();
+    const active=h.root.querySelector('[data-smart-zone="bedroom"]');
+    assert.equal(active.querySelector('[data-boost="target"]').disabled,true);
+    assert.equal(active.querySelector('[data-boost="target"]').value,'24');
+    assert.equal(active.querySelector('[data-boost="minutes"]').disabled,true);
+    assert.match(active.textContent,/Temperature locked/);
+    click(h.root,'smart-boost-cancel','[data-zone="bedroom"]');await settle();
+    assert.equal(h.root.querySelector('[data-smart-zone="bedroom"] [data-boost="target"]').disabled,false);
+    assert.equal(h.root.querySelector('[data-smart-zone="bedroom"] [data-boost="minutes"]').disabled,false);
+  }finally{h.close();}
+});
+
+test('a boost arriving during dial drag immediately locks the mini card without sending a target',async()=>{
+  const h=await setup({demo:true,layout:'mini',zone_id:'lounge'});try{
+    const calls=[];h.card._config.demo=false;h.card._status='connected';h.card._data.observe_only=false;h.card._hass={callService:async(...args)=>calls.push(args)};
+    h.card._render();const dial=h.root.querySelector('[data-mini-dial]');dial.getBoundingClientRect=()=>({left:100,top:100,width:200,height:200});
+    dial.dispatchEvent(new h.dom.window.MouseEvent('pointerdown',{bubbles:true,cancelable:true,clientX:200,clientY:100,button:0}));assert.ok(h.card._dialDrag);
+    const next=structuredClone(h.card._data),z=next.zones.find(z=>z.id==='lounge');z.boost.active=true;z.boost.can_cancel=true;z.smart.boost={target:25,until:'2026-11-16T09:00:00.000Z'};z.device_target=25;z.source='boost';
+    h.card._receive(next);assert.equal(h.card._dialDrag,null);assert.equal(h.card._miniTarget,null);
+    const locked=h.root.querySelector('[data-mini-dial]');assert.equal(locked.getAttribute('aria-disabled'),'true');assert.match(locked.textContent,/Boost · locked/);
+    assert.equal(h.root.querySelector('[data-boost="minutes"]').disabled,true);assert.equal(h.root.querySelector('[data-action="smart-boost-cancel"]').disabled,false);
+    locked.dispatchEvent(new h.dom.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));await h.card._miniSetTarget(26);assert.equal(calls.length,0);
+    z.boost.active=false;z.smart.boost=null;z.source='schedule';h.card._receive(next);assert.equal(h.root.querySelector('[data-mini-dial]').getAttribute('aria-disabled'),'false');
+  }finally{h.close();}
+});
