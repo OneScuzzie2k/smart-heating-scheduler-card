@@ -2,15 +2,15 @@
 
 A companion Lovelace card for [Smart Heating Scheduler](https://github.com/OneScuzzie2k/smart-heating-scheduler), with a full weekly planner, calendar profiles, heating history, optional smart-preheating settings and compact thermostat/boost cards. Supports desktop, tablet and phone layouts, plus Home Assistant light/dark themes.
 
-**Stable release 0.5.2:** install this [card](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.5.2) and the [integration](https://github.com/OneScuzzie2k/smart-heating-scheduler/releases/tag/0.5.2). Requires **Home Assistant Core 2026.11.1 or newer**. The two packages are installed separately; including pre-releases is not required. See [feature setup and limits](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/PROFILES_HISTORY_PREHEATING.md) and [acceptance scope](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/RELEASE_ACCEPTANCE.md).
+**Stable release 0.5.3:** install this [card](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.5.3) and the [integration](https://github.com/OneScuzzie2k/smart-heating-scheduler/releases/tag/0.5.3). Requires **Home Assistant Core 2026.11.1 or newer**. The two packages are installed separately; including pre-releases is not required. See [feature setup and limits](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/PROFILES_HISTORY_PREHEATING.md) and [acceptance scope](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/RELEASE_ACCEPTANCE.md).
 
 **[Full installation and setup guide](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md)** - zone setup, schedules, boost choices, occupancy, heating-control handover, updates and rollback.
 
 No additional custom card, separate add-on, runtime CDN or end-user Node.js installation is required. Your thermostat's existing HA integration is still required.
 
-## Fixed in 0.5.2
+## Fixed in 0.5.3
 
-Frost can use the thermostat’s supported lower range independently of the normal schedule minimum. Failed saves keep a visible explanation beside Save settings across status updates. Requires integration 0.5.2.
+Frost can use the thermostat’s supported lower range independently of the normal schedule minimum. Failed saves keep a visible explanation beside Save settings across status updates. Requires integration 0.5.3.
 
 ## Features
 
@@ -35,8 +35,8 @@ Desktop and phone layouts from the working 0.3.0 card. These screenshots use sam
 1. In **Settings > Marketplace**, choose **Add from link** and add:
    `https://github.com/OneScuzzie2k/smart-heating-scheduler-card`.
    Check that the repository is shown as type **Dashboard**.
-2. Select stable **0.5.2**; use **Install another version** if needed. Install the card. Include pre-releases is not required.
-3. Install [the backend repository](https://github.com/OneScuzzie2k/smart-heating-scheduler) separately as type **Integration**, version **0.5.2**. Follow its restart prompt. Under **Settings > Devices & services**, add **Smart Heating Scheduler**, then **Add heating zone** for each thermostat.
+2. Select stable **0.5.3**; use **Install another version** if needed. Install the card. Include pre-releases is not required.
+3. Install [the backend repository](https://github.com/OneScuzzie2k/smart-heating-scheduler) separately as type **Integration**, version **0.5.3**. Follow its restart prompt. Under **Settings > Devices & services**, add **Smart Heating Scheduler**, then **Add heating zone** for each thermostat.
 4. Allow Marketplace to register the JavaScript resource, then reload your browser or Companion App frontend. For YAML-managed resources, add the module entry shown in the install dialog. Register it once.
 5. On an editable dashboard, select **Edit dashboard > Add card > Smart Heating Scheduler**. Choose **Full scheduler** and select your scheduler from the **Scheduler** field. Save and confirm **Observe only**.
 6. Create the weekly schedules in the full card. Follow the [reviewed handover](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#6-hand-over-heating-control) when ready to enable real heating control. This is global to every enabled zone.
@@ -47,7 +47,7 @@ The visual editor supplies the scheduler `entry_id` automatically. To use YAML, 
 
 ### Manual card installation
 
-Download **smart-heating-scheduler-card.js** from the [release assets](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.5.2). Copy it to `<config>/www/smart-heating-scheduler-card.js` and register `/local/smart-heating-scheduler-card.js` as a **JavaScript module** dashboard resource (`type: module` for a YAML resource list). Reload the frontend. The backend must also be installed; see its [manual installation instructions](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#manual-installation).
+Download **smart-heating-scheduler-card.js** from the [release assets](https://github.com/OneScuzzie2k/smart-heating-scheduler-card/releases/tag/0.5.3). Copy it to `<config>/www/smart-heating-scheduler-card.js` and register `/local/smart-heating-scheduler-card.js` as a **JavaScript module** dashboard resource (`type: module` for a YAML resource list). Reload the frontend. The backend must also be installed; see its [manual installation instructions](https://github.com/OneScuzzie2k/smart-heating-scheduler/blob/main/docs/INSTALLATION.md#manual-installation).
 
 For updates, reload all frontends after replacing the card. A card-only update needs no HA restart. Use one installation method/resource entry so multiple versions are not loaded together.
 
@@ -107,3 +107,7 @@ view: dashboard
 The visual card editor selects entry/title/theme/view. Leave demo out for connected data. Browser clocks are for display only; the backend owns real deadlines and commands. No HA URL/token or home mapping is embedded in sample previews.
 
 Marketplace installation, manual targets/resume, boost start/cancel and occupancy activation have been exercised on a supervised two-zone setup. Additional thermostat models, automatic expiry/restart/holiday field acceptance, screen readers, 200% zoom, broader themes and translations remain release work. MIT licensed. Bulk holiday scope and defaults/inheritance remain follow-up work; current smart rules are independent per zone.
+
+## Household boost
+
+With integration and card 0.5.3, non-administrator users can use boost duration/target and Start/Stop in the full and mini cards when allowed to read/control the mapped thermostat. External adapters also require control permission on their scripts and optional duration helper. Schedule editing, manual mini-dial editing and scheduler settings keep their existing administrator restrictions. Restart Home Assistant after updating the integration, then reload the browser/Companion app frontend.

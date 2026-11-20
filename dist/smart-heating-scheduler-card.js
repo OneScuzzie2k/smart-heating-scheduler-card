@@ -690,7 +690,8 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       const target = this._miniTarget ?? z.device_target ?? z.limits.minimum;
       const fill = Math.max(0, Math.min(270, (Number(target) - z.limits.minimum) / (z.limits.maximum - z.limits.minimum) * 270));
       const canSet = this._miniCanSet(z), disabled = !this._canEdit() || this._saving;
-      const boostDisabled = disabled || !(z.boost.active ? z.boost.can_cancel : z.boost.can_start);
+      const boostRestricted = !this._canBoost(z) || this._saving;
+      const boostDisabled = boostRestricted || !(z.boost.active ? z.boost.can_cancel : z.boost.can_start);
       const caption = z.mode === "off" ? "Off" : z.hvac_action === "heating" ? "Heating" : z.hvac_action === "idle" ? "Idle" : "Activity unknown";
       const href = this._config.dashboard_path?.startsWith("/") && !this._config.dashboard_path.startsWith("//") ? this._config.dashboard_path : null;
       const thermometer = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14.8V5a2 2 0 0 1 4 0v9.8a4 4 0 1 1-4 0Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 9v9" stroke="currentColor" stroke-width="2"/></svg>';
@@ -699,7 +700,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       <div class="mini-thermostat"><header class="mini-head"><h2>${href ? `<a href="${escapeHTML(href)}" aria-label="${escapeHTML(this._config.title || z.name)} full scheduler">${escapeHTML(this._config.title || z.name)}</a>` : escapeHTML(this._config.title || z.name)}</h2><button type="button" class="mini-more" data-action="more" data-zone="${escapeHTML(z.id)}" aria-label="Open native thermostat" ${z.climate_entity ? "" : "disabled"}>\u22EE</button></header>
       <div class="ring mini-dial" data-mini-dial role="slider" tabindex="${canSet ? "0" : "-1"}" aria-label="Target temperature dial" aria-valuemin="${z.limits.minimum}" aria-valuemax="${z.limits.maximum}" aria-valuenow="${escapeHTML(target)}" aria-valuetext="${escapeHTML(this._temp(Number(target), z.unit))}" aria-disabled="${!canSet}" style="--fill:${fill}"><svg class="mini-arc" viewBox="0 0 200 200" aria-hidden="true"><circle class="arc-track" cx="100" cy="100" r="85" stroke-dasharray="400.553 534.071"/><circle class="arc-value" data-mini-arc cx="100" cy="100" r="85" stroke-dasharray="${fill / 360 * 534.071} 534.071"/></svg><span class="dial-thumb" aria-hidden="true"></span><span class="mini-caption">${escapeHTML(this._data.observe_only && !this._config.demo ? "Observe only" : caption)}</span><div class="reading" data-mini-reading>${escapeHTML(this._temp(Number(target), z.unit))}</div><span class="mini-room" aria-label="Room temperature ${escapeHTML(this._temp(z.current_temperature, z.unit))}">${thermometer}${escapeHTML(this._temp(z.current_temperature, z.unit))}</span></div>
       ${z.source === "manual" ? `<button type="button" class="mini-resume" data-action="smart-resume" data-zone="${escapeHTML(z.id)}" ${disabled || !this._config.demo && this._data.observe_only ? "disabled" : ""}>Manual \xB7 Resume schedule</button>` : z.source === "occupied_comfort" ? '<span class="mini-state" role="img" aria-label="Occupancy override active" title="Occupancy override active"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4" fill="currentColor"/><path d="M4 21v-3a8 8 0 0 1 16 0v3Z" fill="currentColor"/></svg>Occupied</span>' : z.source === "holiday" ? '<span class="mini-state">Holiday</span>' : ""}</div>
-      <div class="mini-boost" data-smart-zone="${escapeHTML(z.id)}"><input type="hidden" data-boost="target" value="${escapeHTML(p?.boost_target ?? "")}"><label class="mini-slider"><span class="mini-boost-label"><span class="mini-timer" aria-hidden="true">\u25F4</span><span>Boost time<output data-mini-minutes>${z.boost.active ? escapeHTML(remainingText(z.boost.until, this._now())) : escapeHTML(duration) + " minutes"}</output></span></span><input type="range" data-boost="minutes" aria-label="Boost duration" min="${min}" max="${max}" step="${durationStep}" value="${escapeHTML(duration)}" ${disabled || z.boost.active || p?.boost_owner === "external" && !p.duration_helper ? "disabled" : ""}></label></div>
+      <div class="mini-boost" data-smart-zone="${escapeHTML(z.id)}"><input type="hidden" data-boost="target" value="${escapeHTML(p?.boost_target ?? "")}"><label class="mini-slider"><span class="mini-boost-label"><span class="mini-timer" aria-hidden="true">\u25F4</span><span>Boost time<output data-mini-minutes>${z.boost.active ? escapeHTML(remainingText(z.boost.until, this._now())) : escapeHTML(duration) + " minutes"}</output></span></span><input type="range" data-boost="minutes" aria-label="Boost duration" min="${min}" max="${max}" step="${durationStep}" value="${escapeHTML(duration)}" ${boostRestricted || z.boost.active || p?.boost_owner === "external" && !p.duration_helper ? "disabled" : ""}></label></div>
       <button type="button" class="mini-boost-button" data-action="smart-${z.boost.active ? "boost-cancel" : "boost-start"}" data-zone="${escapeHTML(z.id)}" ${boostDisabled ? "disabled" : ""}>${flame}${z.boost.active ? "Stop boost" : "Boost"}</button>
       ${this._error ? `<p class="error" role="alert">${escapeHTML(this._error)}</p>` : ""}<span class="mini-sr" role="status">${escapeHTML(this._message || "")}</span></section>${this._modal()}`;
     }
@@ -777,7 +778,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
     _smartBoostControls(z) {
       const s = z.smart, p = s?.policy;
       if (!p) return "<small>Update the integration to configure smart controls.</small>";
-      const disabled = !this._canEdit() || this._saving;
+      const disabled = !this._canBoost(z) || this._saving;
       const boostDraft = this._boostInputs?.[z.id] || {};
       return `<div data-smart-zone="${escapeHTML(z.id)}"><fieldset ${disabled ? "disabled" : ""}><div class="form-grid"><label>Boost target (${escapeHTML(z.unit)})<input data-boost="target" type="number" min="${z.limits.minimum}" max="${z.limits.maximum}" step="${z.limits.step || "any"}" value="${escapeHTML(boostDraft.target ?? p.boost_target ?? "")}" ${p.boost_owner !== "builtin" ? "disabled" : ""}></label><label>Minutes<input data-boost="minutes" type="number" min="1" max="${p.boost_max_minutes}" step="1" value="${escapeHTML(boostDraft.minutes ?? p.boost_minutes)}" ${p.boost_owner === "external" && !p.duration_helper ? "disabled" : ""}></label></div><div class="boost-controls"><small>${z.boost.active ? escapeHTML(remainingText(z.boost.until, this._now())) + " \xB7 " : ""}${p.boost_owner === "external" ? "External scripts \xB7 fixed declared target" : this._data.observe_only ? "Observe-only boost \xB7 heating unchanged" : "Timed heating boost"}</small>${btn2(z.boost.active ? "Stop boost" : "Start boost", z.boost.active ? "boost-cancel" : "boost-start", disabled || !(z.boost.active ? z.boost.can_cancel : z.boost.can_start), `data-zone="${escapeHTML(z.id)}"`, "primary")}</div></fieldset></div>`;
     },
@@ -819,8 +820,9 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       return matches[0];
     },
     async _smartAction(action, data) {
-      if (!this._canEdit() || this._saving) return;
-      const z = this._zoneFor(data.zone) || this._zone(), s = z.smart;
+      const z = this._zoneFor(data.zone) || this._zone(), s = z?.smart;
+      const boost = action === "boost-start" || action === "boost-cancel";
+      if (this._saving || !(boost ? this._canBoost(z) : this._canEdit())) return;
       if (!s) {
         this._error = "Update the integration first.";
         this._render();
@@ -1259,6 +1261,9 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
     }
     _canEdit() {
       return Boolean(this._data?.can_edit && ["connected", "demo"].includes(this._status) && (this._config.demo || this._hass?.connection?.connected !== false));
+    }
+    _canBoost(z) {
+      return Boolean(z && (z.can_boost ?? this._data?.can_edit) && ["connected", "demo"].includes(this._status) && (this._config.demo || this._hass?.connection?.connected !== false));
     }
     _now() {
       return this._config?.demo ? this._data.generated_at : (/* @__PURE__ */ new Date()).toISOString();

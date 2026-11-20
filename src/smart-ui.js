@@ -40,7 +40,7 @@ export const smartUI = {
   _smartBoostControls(z) {
     const s=z.smart, p=s?.policy;
     if(!p)return '<small>Update the integration to configure smart controls.</small>';
-    const disabled=!this._canEdit() || this._saving;
+    const disabled=!this._canBoost(z) || this._saving;
     const boostDraft=this._boostInputs?.[z.id]||{};
     return `<div data-smart-zone="${e(z.id)}"><fieldset ${disabled?'disabled':''}><div class="form-grid"><label>Boost target (${e(z.unit)})<input data-boost="target" type="number" min="${z.limits.minimum}" max="${z.limits.maximum}" step="${z.limits.step||'any'}" value="${e(boostDraft.target??p.boost_target??'')}" ${p.boost_owner!=='builtin'?'disabled':''}></label><label>Minutes<input data-boost="minutes" type="number" min="1" max="${p.boost_max_minutes}" step="1" value="${e(boostDraft.minutes??p.boost_minutes)}" ${p.boost_owner==='external'&&!p.duration_helper?'disabled':''}></label></div><div class="boost-controls"><small>${z.boost.active?e(remainingText(z.boost.until,this._now()))+' · ':''}${p.boost_owner==='external'?'External scripts · fixed declared target':this._data.observe_only?'Observe-only boost · heating unchanged':'Timed heating boost'}</small>${btn(z.boost.active?'Stop boost':'Start boost',z.boost.active?'boost-cancel':'boost-start',disabled || !(z.boost.active?z.boost.can_cancel:z.boost.can_start),`data-zone="${e(z.id)}"`,'primary')}</div></fieldset></div>`;
   },
@@ -73,8 +73,9 @@ export const smartUI = {
     return matches[0];
   },
   async _smartAction(action, data) {
-    if(!this._canEdit()||this._saving)return;
-    const z=this._zoneFor(data.zone)||this._zone(), s=z.smart;
+    const z=this._zoneFor(data.zone)||this._zone(), s=z?.smart;
+    const boost=action==='boost-start'||action==='boost-cancel';
+    if(this._saving || !(boost?this._canBoost(z):this._canEdit()))return;
     if(!s){this._error='Update the integration first.';this._render();return;}
     this._smartInputs ||= {};this._smartInputs[z.id] ||= {};
     const input=this._smartInputs[z.id], p=clone(s.policy);

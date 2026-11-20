@@ -151,6 +151,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
   _zone() { return this._data?.zones.find(z => z.id === this._zoneId) || this._data?.zones[0]; }
   _week() { return this._draft || this._zone()?.week; }
   _canEdit() { return Boolean(this._data?.can_edit && ['connected','demo'].includes(this._status) && (this._config.demo || this._hass?.connection?.connected !== false)); }
+  _canBoost(z) { return Boolean(z && (z.can_boost ?? this._data?.can_edit) && ['connected','demo'].includes(this._status) && (this._config.demo || this._hass?.connection?.connected !== false)); }
   _now() { return this._config?.demo ? this._data.generated_at : new Date().toISOString(); }
   _local(iso = this._now()) { return localParts(iso, this._data?.timezone || 'UTC'); }
   _temp(value, unit = this._zone()?.unit || '°C') {

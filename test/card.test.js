@@ -241,3 +241,25 @@ test('preheating shows the actual pause reason and explains presence independenc
   click(h.root,'nav','[data-view="settings"]');assert.match(h.root.textContent,/Holiday is active/);assert.match(h.root.textContent,/Presence alone does not pause/);
  }finally{h.close();}
 });
+
+
+test('household users can boost in full and mini cards without editing settings or manual dial',async()=>{
+  for(const mini of [false,true]){
+    const h=await setup(mini?{demo:true,layout:'mini',zone_id:'bedroom'}:{demo:true});try{
+      h.card._data.can_edit=false;h.card._data.zones[0].can_boost=true;h.card._data.zones[1].can_boost=false;h.card._render();
+      assert.equal(h.root.querySelector('[data-boost="minutes"]').disabled,false);
+      click(h.root,'smart-boost-start','[data-zone="bedroom"]');await settle();
+      assert.ok(h.card._data.zones[0].smart.boost);
+      click(h.root,'smart-boost-cancel','[data-zone="bedroom"]');await settle();
+      assert.equal(h.card._data.zones[0].smart.boost,null);
+      await h.card._smartAction('boost-start',{zone:'lounge'});assert.equal(h.card._data.zones[1].smart.boost,null);
+      await h.card._smartAction('presence-away',{zone:'bedroom'});assert.equal(h.card._data.zones[0].smart.override,null);
+      if(mini)assert.equal(h.root.querySelector('[data-mini-dial]').getAttribute('aria-disabled'),'true');
+      else {click(h.root,'nav','[data-view="schedules"]');assert.equal(h.root.querySelector('[data-action="edit"]').disabled,true);}
+      h.card._status='disconnected';assert.equal(h.card._canBoost(h.card._zone()),false);
+      h.card._status='demo';h.card._data.zones[0].can_boost=false;h.card._render();
+      if(!mini)click(h.root,'nav','[data-view="dashboard"]');
+      assert.equal(h.root.querySelector('[data-action="smart-boost-start"]').disabled,true);
+    }finally{h.close();}
+  }
+});

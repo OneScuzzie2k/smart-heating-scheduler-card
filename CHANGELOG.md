@@ -1,3 +1,9 @@
+# 0.5.3 — boost for household users
+
+- Full and mini boost controls use server-supplied per-zone permissions instead of requiring administrator access.
+- Settings, schedules and other administrator controls retain their restrictions. Disconnected cards cannot boost.
+- Requires integration 0.5.3 and a frontend reload. 46 frontend/model/DOM tests pass.
+
 # 0.5.2 — clear preheating priority and pause reasons
 
 - Show the actual pause reason supplied by the backend.
