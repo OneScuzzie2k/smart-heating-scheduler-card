@@ -380,3 +380,62 @@ test('receiver transition summaries replace stale preparations without implying 
     h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-start_transition"]'),null);assert.match(h.root.textContent,/Lower target observed: not yet/);assert.match(h.root.textContent,/First boundary missed/);assert.equal(h.root.querySelector('[data-action="receiver-enable_owner"]').disabled,true);
   }finally{h.close();}
 });
+
+
+test('Hive tiles keep target controls in the dialog and isolate mode changes by zone',async()=>{
+  const h=await setup({demo:true,thermostat_style:'hive'});try{
+    assert.equal(h.root.querySelectorAll('.hive-thermostat').length,2);
+    assert.equal(h.root.querySelectorAll('[data-boost="target"]').length,0);
+    const z=h.card._data.zones[1],first=h.card._data.zones[0],before=first.mode;
+    click(h.root,'hive-mode',`[data-zone="${z.id}"][data-mode="off"]`);await settle();
+    assert.equal(z.mode,'off');assert.equal(first.mode,before);
+    click(h.root,'hive-mode',`[data-zone="${z.id}"][data-mode="manual"]`);await settle();
+    assert.equal(z.mode,'heat');assert.equal(z.source,'manual');
+    click(h.root,'hive-boost',`[data-zone="${z.id}"]`);
+    assert.ok(h.root.querySelector('[role="dialog"][aria-label="Boost heating"]'));
+    assert.equal(h.root.querySelectorAll('[data-boost="target"]').length,1);
+    assert.equal(h.root.querySelector('[data-smart-zone]').dataset.smartZone,z.id);
+  }finally{h.close();}
+});
+
+test('Hive full dashboard keyboard dial changes the addressed zone only',async()=>{
+  const h=await setup({demo:true,thermostat_style:'hive'});try{
+    const [first,second]=h.card._data.zones,original=first.device_target;
+    const dial=h.root.querySelector(`[data-mini-dial="${second.id}"]`),target=second.device_target;
+    dial.dispatchEvent(new h.dom.window.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));await settle();
+    assert.equal(second.device_target,target+(second.limits.step||0.5));
+    assert.equal(first.device_target,original);
+  }finally{h.close();}
+});
+
+test('Hive mini boost dialog works for household users while modes and dial stay disabled',async()=>{
+  const h=await setup({demo:true,layout:'mini',thermostat_style:'hive'});try{
+    const z=h.card._miniZone();h.card._data.can_edit=false;z.can_boost=true;h.card._render();
+    assert.equal(h.root.querySelector('[data-action="hive-mode"]').disabled,true);
+    assert.equal(h.root.querySelector('[data-mini-dial]').getAttribute('aria-disabled'),'true');
+    click(h.root,'hive-boost');assert.ok(h.root.querySelector('[role="dialog"]'));
+    assert.equal(h.root.querySelector('[data-action="smart-boost-start"]').disabled,false);
+    click(h.root,'close');assert.equal(h.root.querySelector('[role="dialog"]'),null);
+  }finally{h.close();}
+});
+
+test('Hive native overlay locks the dial and preserves readable occupancy status',async()=>{
+  const h=await setup({demo:true,layout:'mini',thermostat_style:'hive'});try{
+    const z=h.card._miniZone();z.receiver={schedule_owner:'receiver',ownership:{hardware:{mode:'boost'},lease:{target:2000}}};z.source='occupied_comfort';h.card._render();
+    assert.match(h.root.querySelector('.hive-badge').textContent,/Occupied/);
+    assert.equal(h.root.querySelector('[data-mini-dial]').getAttribute('aria-disabled'),'true');
+    const value=z.device_target;h.root.querySelector('[data-mini-dial]').dispatchEvent(new h.dom.window.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));await settle();assert.equal(z.device_target,value);
+    assert.match(h.root.querySelector('.hive-context').textContent,/Occupancy override/);
+  }finally{h.close();}
+});
+
+test('Hive live mode actions require backend support and send explicit selected-zone commands',async()=>{
+  const h=await setup({demo:true,thermostat_style:'hive'});try{
+    const calls=[],z=h.card._data.zones[1];h.card._config.demo=false;h.card._status='connected';h.card._data.observe_only=false;
+    h.card._hass={connection:{connected:true},callWS:async request=>{calls.push(request);return structuredClone(h.card._data);}};
+    h.card._render();assert.equal(h.root.querySelector('[data-action="hive-mode"]').disabled,true);
+    h.card._data.thermostat_mode_control=true;h.card._render();
+    click(h.root,'hive-mode',`[data-zone="${z.id}"][data-mode="manual"]`);await settle();
+    assert.equal(calls.length,1);assert.equal(calls[0].zone_id,z.id);assert.equal(calls[0].action,'thermostat_mode');assert.equal(calls[0].payload.mode,'manual');
+  }finally{h.close();}
+});

@@ -111,3 +111,9 @@ Marketplace installation, manual targets/resume, boost start/cancel and occupanc
 ## Household boost
 
 With integration and card 0.5.3, non-administrator users can use boost duration/target and Start/Stop in the full and mini cards when allowed to read/control the mapped thermostat. External adapters also require control permission on their scripts and optional duration helper. Schedule editing, manual mini-dial editing and scheduler settings keep their existing administrator restrictions. Restart Home Assistant after updating the integration, then reload the browser/Companion app frontend.
+
+### Optional Hive-inspired thermostat layout (0.6.0-dev.5)
+
+In the visual card editor, choose **Thermostat style → Hive inspired · modes and dial**. Available for the full dashboard and mini cards. Classic compact remains the default. The round control changes the manual target; room temperature stays central. Schedule, Manual and Off are explicit administrator controls, with household Boost available under existing thermostat permissions. Boost target and duration open in a dialog. Requires integration 0.6.0-dev.5 for explicit modes. No hot-water card is included. Receiver scheduling remains available only for individually qualified, supported Hive/ZHA receivers; other supported climate entities continue using HA schedules.
+
+`demo/hive-preview.html` is a working, disconnected sample preview when this repository is served locally.

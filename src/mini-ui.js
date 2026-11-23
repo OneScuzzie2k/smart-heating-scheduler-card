@@ -11,19 +11,19 @@ export function dialTemperature(limits,x,y,rect,unit='°C') {
 }
 
 export const miniUI = {
-  _miniZone() {return this._config.zone_id?this._data?.zones.find(z=>z.id===this._config.zone_id):this._zone();},
-  _miniCanSet(z) {return !!(z&&this._canEdit()&&!this._saving&&(this._config.demo||!this._data.observe_only)&&z.enabled&&z.mode==='heat'&&!z.boost.active&&!z.smart?.external_operation&&!['holiday','unavailable','unsupported','error','disabled','boost_unknown','boost_handover'].includes(z.source)&&!z.error);},
-  _previewMiniTarget(value) {
-    const z=this._miniZone();if(!z||value===null)return;
-    this._miniTarget=value;
-    const ring=this.shadowRoot.querySelector('[data-mini-dial]');
+  _miniZone() {if(this._dialDrag)return this._zoneFor(this._dialDrag.zone);return this._config.zone_id?this._data?.zones.find(z=>z.id===this._config.zone_id):this._zone();},
+  _miniCanSet(z) {return !!(z&&this._canEdit()&&!this._saving&&(this._config.demo||!this._data.observe_only)&&z.enabled&&z.mode==='heat'&&!z.boost.active&&z.receiver?.ownership?.hardware?.mode!=='boost'&&!z.smart?.external_operation&&!['holiday','unavailable','unsupported','error','disabled','boost_unknown','boost_handover'].includes(z.source)&&!z.error);},
+  _previewMiniTarget(value,z=this._miniZone()) {
+    if(!z||value===null)return;
+    this._miniTarget=value;this._miniTargetZone=z.id;
+    const ring=[...this.shadowRoot.querySelectorAll('[data-mini-dial]')].find(el=>!el.dataset.miniDial||el.dataset.miniDial===z.id);
     const fill=Math.max(0,Math.min(270,(value-z.limits.minimum)/(z.limits.maximum-z.limits.minimum)*270));
     if(ring){ring.style.setProperty('--fill',fill);ring.setAttribute('aria-valuenow',value);ring.setAttribute('aria-valuetext',this._temp(value,z.unit));}
-    const output=this.shadowRoot.querySelector('[data-mini-reading]');if(output)output.textContent=this._temp(value,z.unit);
-    const arc=this.shadowRoot.querySelector('[data-mini-arc]');if(arc)arc.setAttribute('stroke-dasharray',`${fill/360*534.071} 534.071`);
+    const output=[...this.shadowRoot.querySelectorAll('[data-mini-reading]')].find(el=>!el.dataset.miniReading||el.dataset.miniReading===z.id);if(output)output.textContent=this._temp(value,z.unit);
+    const arc=[...this.shadowRoot.querySelectorAll('[data-mini-arc]')].find(el=>!el.dataset.miniArc||el.dataset.miniArc===z.id);if(arc)arc.setAttribute('stroke-dasharray',`${fill/360*534.071} 534.071`);
   },
   _miniDialDown(event) {
-    const dial=event.target.closest('[data-mini-dial]'), z=this._miniZone();
+    const dial=event.target.closest('[data-mini-dial]'), z=dial?.dataset.miniDial?this._zoneFor(dial.dataset.miniDial):this._miniZone();
     if(!dial||!this._miniCanSet(z)||this._dialDrag||event.button!==0||event.isPrimary===false)return;
     const rect=dial.getBoundingClientRect();
     const radius=Math.hypot((event.clientX-rect.left-rect.width/2)/rect.width,(event.clientY-rect.top-rect.height/2)/rect.height);
@@ -31,39 +31,41 @@ export const miniUI = {
     event.preventDefault();dial.focus({preventScroll:true});
     this._dialDrag={id:event.pointerId,zone:z.id,dial,rect};
     dial.setPointerCapture?.(event.pointerId);
-    this._previewMiniTarget(dialTemperature(z.limits,event.clientX,event.clientY,rect,z.unit));
+    this._previewMiniTarget(dialTemperature(z.limits,event.clientX,event.clientY,rect,z.unit),z);
   },
   _miniDialMove(event) {
-    const drag=this._dialDrag,z=this._miniZone();
+    const drag=this._dialDrag,z=drag?this._zoneFor(drag.zone):null;
     if(!drag||drag.id!==event.pointerId||z?.id!==drag.zone)return;
     event.preventDefault();
-    this._previewMiniTarget(dialTemperature(z.limits,event.clientX,event.clientY,drag.rect,z.unit));
+    this._previewMiniTarget(dialTemperature(z.limits,event.clientX,event.clientY,drag.rect,z.unit),z);
   },
   _miniDialEnd(event,cancel=false) {
     const drag=this._dialDrag;if(!drag||drag.id!==event.pointerId)return;
     const value=this._miniTarget;this._dialDrag=null;
     if(drag.dial.hasPointerCapture?.(event.pointerId))drag.dial.releasePointerCapture(event.pointerId);
-    if(cancel||this._miniZone()?.id!==drag.zone||!this._miniCanSet(this._miniZone())){this._miniTarget=null;this._render();return;}
-    void this._miniSetTarget(value);
+    if(cancel||!this._miniCanSet(this._zoneFor(drag.zone))){this._miniTarget=null;this._render();return;}
+    void this._miniSetTarget(value,drag.zone);
   },
   _miniDialKey(event) {
-    if(!event.target.matches('[data-mini-dial]')||!this._miniCanSet(this._miniZone()))return;
-    const z=this._miniZone(),step=z.limits.step||(z.unit==='°F'?1:0.5), current=Number(this._miniTarget??z.device_target??z.limits.minimum);
+    const z=event.target.dataset.miniDial?this._zoneFor(event.target.dataset.miniDial):this._miniZone();
+    if(!event.target.matches('[data-mini-dial]')||!this._miniCanSet(z))return;
+    const step=z.limits.step||(z.unit==='°F'?1:0.5), current=Number(this._miniTarget??z.device_target??z.limits.minimum);
     const offsets={ArrowRight:step,ArrowUp:step,ArrowLeft:-step,ArrowDown:-step,PageUp:step*10,PageDown:-step*10};
     let value=event.key==='Home'?z.limits.minimum:event.key==='End'?z.limits.maximum:current+offsets[event.key];
     if(!Number.isFinite(value))return;
     event.preventDefault();value=Number(Math.max(z.limits.minimum,Math.min(z.limits.maximum,value)).toFixed(6));
-    this._previewMiniTarget(value);void this._miniSetTarget(value);
+    this._previewMiniTarget(value,z);void this._miniSetTarget(value,z.id);
   },
-  async _miniSetTarget(raw) {
-    const z=this._miniZone();if(!this._miniCanSet(z))return;
+  async _miniSetTarget(raw,zoneId) {
+    const z=zoneId?this._zoneFor(zoneId):this._miniZone();if(!this._miniCanSet(z))return;
     const value=Number(raw), step=z.limits.step;
     if(!Number.isFinite(value)||value<z.limits.minimum||value>z.limits.maximum||step&&Math.abs(value/step-Math.round(value/step))>1e-6){this._error='Choose a target within this zone’s reviewed limits.';this._render();return;}
     this._saving=true;this._error='';this._render();
     try{
       // Same native thermostat action as HA's thermostat card. The integration
       // observes this as a manual change and applies the zone's hold policy.
-      if(this._config.demo){z.device_target=value;z.proposed_target=value;z.source='manual';}
+      if(this._config.demo){z.device_target=value;z.proposed_target=value;z.source='manual';if(this._config.thermostat_style==='hive'&&z.receiver?.ownership)z.receiver.ownership.hardware={mode:'manual'};}
+      else if(this._config.thermostat_style==='hive'&&this._data.thermostat_mode_control)this._data=await this._hass.callWS({type:'smart_heating_scheduler/control',entry_id:this._config.entry_id,zone_id:z.id,action:'thermostat_mode',payload:{mode:'manual',target:value}});
       else await this._hass.callService('climate','set_temperature',{temperature:value},{entity_id:z.climate_entity});
       this._message='Manual target sent';
     }catch(error){this._error=error.message||'Could not set the thermostat target.';}
@@ -72,6 +74,7 @@ export const miniUI = {
   _mini() {
     const z=this._miniZone();
     if(!z)return `<div class="wrap mini"><h2>Heating zone unavailable</h2><p>Choose a valid zone in the card editor.</p></div>`;
+    if(this._config.thermostat_style==='hive')return `<div class="hive-mini">${this._hiveTile(z,true)}${this._error?`<p class="error" role="alert">${e(this._error)}</p>`:''}<span class="mini-sr" role="status">${e(this._message||'')}</span></div>${this._modal()}`;
     const p=z.smart?.policy, helper=this._hass?.states?.[p?.duration_helper]?.attributes;
     const max=Math.min(p?.boost_max_minutes||120,helper?.max||1440), min=Math.max(1,helper?.min||1), durationStep=helper?.step||1;
     const duration=this._boostInputs?.[z.id]?.minutes??p?.boost_minutes??30;

@@ -649,6 +649,12 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
 .learning-progress{width:100%;height:8px;accent-color:var(--shs-teal)}textarea{width:100%;box-sizing:border-box;max-width:100%;border:1px solid var(--shs-line);border-radius:10px;background:var(--shs-panel2);color:var(--shs-ink);padding:12px}.import-preview{max-height:220px;overflow:auto;font-size:12px;line-height:1.8;overflow-wrap:anywhere}.modal .toolbar{flex-wrap:wrap}.modal{max-width:calc(100cqw - 32px)}.modal input[type=file]{max-width:100%;min-width:0}
 
 .feature-save-error{flex-basis:100%;margin:0;overflow-wrap:anywhere}.smart-feature .draft-bar{flex-wrap:wrap}
+
+/* Optional Hive-inspired heating-only tile. No extra target field on the face. */
+.hive-thermostat{--mini-accent:#ff8900;--mini-ring:#ff8900;--mini-track:var(--shs-track);position:relative;min-width:0;padding:20px;border:1px solid var(--divider-color,var(--shs-line));border-radius:20px;background:var(--ha-card-background,var(--shs-panel));color:var(--shs-ink)}
+.hive-head{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}.hive-title{display:flex;align-items:center;gap:10px;min-width:0}.hive-title h2{font-size:17px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}.hive-icon{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:12px;color:var(--mini-accent);background:color-mix(in srgb,var(--mini-accent) 12%,transparent)}.hive-icon svg{width:25px;height:25px}.hive-badge{flex:none;border-radius:24px;background:var(--shs-panel2);color:var(--shs-muted);padding:5px 9px;font-size:12px;white-space:nowrap}.hive-warm{color:var(--mini-accent);background:color-mix(in srgb,var(--mini-accent) 12%,transparent)}
+.hive-dial{max-width:300px;margin:16px auto -2px;gap:0}.hive-dial:before{display:none}.hive-dial .mini-arc circle{stroke-width:10}.hive-dial .arc-value{stroke:var(--mini-accent)}.hive-dial .dial-thumb:after{width:17px;height:17px;left:calc(50% - 8.5px);top:calc(7.5% - 8.5px);border:3px solid var(--shs-ink);background:var(--shs-panel)}.hive-current{font-size:clamp(42px,18cqw,66px);font-weight:300;letter-spacing:-2px;line-height:1.15}.hive-current sup{font-size:17px;letter-spacing:0;vertical-align:top;display:inline-block;margin-top:8px;color:var(--shs-muted)}.hive-activity{font-size:14px;line-height:1.5;color:var(--mini-accent);margin-top:6px}.hive-room-label{font-size:11px;color:var(--shs-muted);margin-top:5px}.hive-off .hive-activity{color:var(--shs-muted)}.hive-off .arc-value,.hive-off .dial-thumb{visibility:hidden}
+.hive-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;background:var(--shs-panel2);border-radius:12px;padding:4px}.hive-modes button{border:0;background:transparent;border-radius:9px;padding:8px 3px;min-width:0;font-size:14px;color:var(--shs-muted);font-weight:400}.hive-modes button[aria-pressed=true]{background:var(--shs-panel);box-shadow:0 1px 4px #0001;color:var(--shs-ink);font-weight:600}.hive-footer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:13px}.hive-boost{border:0;background:color-mix(in srgb,var(--mini-accent) 12%,var(--shs-panel));color:var(--mini-accent);font-size:13px;font-weight:500;padding:10px 6px;white-space:normal;min-width:0}.hive-more{border:0;background:transparent;color:var(--shs-muted);font-size:13px;font-weight:400;padding:8px 3px 8px 9px}.hive-more span{font-size:20px;margin-left:5px}.hive-context{height:32px;display:flex;align-items:end;justify-content:center;font-size:11px;color:var(--shs-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hive-mini{container-type:inline-size}.hive-compact{padding:16px}.hive-compact .hive-dial{max-width:270px}.hive-compact .hive-title h2{font-size:15px}.hive-compact .hive-icon{width:32px;height:32px}.hive-compact .hive-icon svg{width:22px;height:22px}@container(max-width:285px){.hive-compact{padding:10px}.hive-compact .hive-icon{display:none}.hive-compact .hive-title h2{font-size:14px}.hive-compact .hive-modes button{font-size:12px}.hive-compact .hive-activity{font-size:12px}.hive-compact .hive-footer{gap:3px}.hive-compact .hive-boost{font-size:11px}.hive-compact .hive-badge{font-size:10px}}
 `;
 
   // src/occupancy-ui.js
@@ -718,29 +724,30 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
   }
   var miniUI = {
     _miniZone() {
+      if (this._dialDrag) return this._zoneFor(this._dialDrag.zone);
       return this._config.zone_id ? this._data?.zones.find((z) => z.id === this._config.zone_id) : this._zone();
     },
     _miniCanSet(z) {
-      return !!(z && this._canEdit() && !this._saving && (this._config.demo || !this._data.observe_only) && z.enabled && z.mode === "heat" && !z.boost.active && !z.smart?.external_operation && !["holiday", "unavailable", "unsupported", "error", "disabled", "boost_unknown", "boost_handover"].includes(z.source) && !z.error);
+      return !!(z && this._canEdit() && !this._saving && (this._config.demo || !this._data.observe_only) && z.enabled && z.mode === "heat" && !z.boost.active && z.receiver?.ownership?.hardware?.mode !== "boost" && !z.smart?.external_operation && !["holiday", "unavailable", "unsupported", "error", "disabled", "boost_unknown", "boost_handover"].includes(z.source) && !z.error);
     },
-    _previewMiniTarget(value) {
-      const z = this._miniZone();
+    _previewMiniTarget(value, z = this._miniZone()) {
       if (!z || value === null) return;
       this._miniTarget = value;
-      const ring = this.shadowRoot.querySelector("[data-mini-dial]");
+      this._miniTargetZone = z.id;
+      const ring = [...this.shadowRoot.querySelectorAll("[data-mini-dial]")].find((el) => !el.dataset.miniDial || el.dataset.miniDial === z.id);
       const fill = Math.max(0, Math.min(270, (value - z.limits.minimum) / (z.limits.maximum - z.limits.minimum) * 270));
       if (ring) {
         ring.style.setProperty("--fill", fill);
         ring.setAttribute("aria-valuenow", value);
         ring.setAttribute("aria-valuetext", this._temp(value, z.unit));
       }
-      const output = this.shadowRoot.querySelector("[data-mini-reading]");
+      const output = [...this.shadowRoot.querySelectorAll("[data-mini-reading]")].find((el) => !el.dataset.miniReading || el.dataset.miniReading === z.id);
       if (output) output.textContent = this._temp(value, z.unit);
-      const arc = this.shadowRoot.querySelector("[data-mini-arc]");
+      const arc = [...this.shadowRoot.querySelectorAll("[data-mini-arc]")].find((el) => !el.dataset.miniArc || el.dataset.miniArc === z.id);
       if (arc) arc.setAttribute("stroke-dasharray", `${fill / 360 * 534.071} 534.071`);
     },
     _miniDialDown(event) {
-      const dial = event.target.closest("[data-mini-dial]"), z = this._miniZone();
+      const dial = event.target.closest("[data-mini-dial]"), z = dial?.dataset.miniDial ? this._zoneFor(dial.dataset.miniDial) : this._miniZone();
       if (!dial || !this._miniCanSet(z) || this._dialDrag || event.button !== 0 || event.isPrimary === false) return;
       const rect = dial.getBoundingClientRect();
       const radius = Math.hypot((event.clientX - rect.left - rect.width / 2) / rect.width, (event.clientY - rect.top - rect.height / 2) / rect.height);
@@ -749,13 +756,13 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       dial.focus({ preventScroll: true });
       this._dialDrag = { id: event.pointerId, zone: z.id, dial, rect };
       dial.setPointerCapture?.(event.pointerId);
-      this._previewMiniTarget(dialTemperature(z.limits, event.clientX, event.clientY, rect, z.unit));
+      this._previewMiniTarget(dialTemperature(z.limits, event.clientX, event.clientY, rect, z.unit), z);
     },
     _miniDialMove(event) {
-      const drag = this._dialDrag, z = this._miniZone();
+      const drag = this._dialDrag, z = drag ? this._zoneFor(drag.zone) : null;
       if (!drag || drag.id !== event.pointerId || z?.id !== drag.zone) return;
       event.preventDefault();
-      this._previewMiniTarget(dialTemperature(z.limits, event.clientX, event.clientY, drag.rect, z.unit));
+      this._previewMiniTarget(dialTemperature(z.limits, event.clientX, event.clientY, drag.rect, z.unit), z);
     },
     _miniDialEnd(event, cancel = false) {
       const drag = this._dialDrag;
@@ -763,26 +770,27 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       const value = this._miniTarget;
       this._dialDrag = null;
       if (drag.dial.hasPointerCapture?.(event.pointerId)) drag.dial.releasePointerCapture(event.pointerId);
-      if (cancel || this._miniZone()?.id !== drag.zone || !this._miniCanSet(this._miniZone())) {
+      if (cancel || !this._miniCanSet(this._zoneFor(drag.zone))) {
         this._miniTarget = null;
         this._render();
         return;
       }
-      void this._miniSetTarget(value);
+      void this._miniSetTarget(value, drag.zone);
     },
     _miniDialKey(event) {
-      if (!event.target.matches("[data-mini-dial]") || !this._miniCanSet(this._miniZone())) return;
-      const z = this._miniZone(), step = z.limits.step || (z.unit === "\xB0F" ? 1 : 0.5), current = Number(this._miniTarget ?? z.device_target ?? z.limits.minimum);
+      const z = event.target.dataset.miniDial ? this._zoneFor(event.target.dataset.miniDial) : this._miniZone();
+      if (!event.target.matches("[data-mini-dial]") || !this._miniCanSet(z)) return;
+      const step = z.limits.step || (z.unit === "\xB0F" ? 1 : 0.5), current = Number(this._miniTarget ?? z.device_target ?? z.limits.minimum);
       const offsets = { ArrowRight: step, ArrowUp: step, ArrowLeft: -step, ArrowDown: -step, PageUp: step * 10, PageDown: -step * 10 };
       let value = event.key === "Home" ? z.limits.minimum : event.key === "End" ? z.limits.maximum : current + offsets[event.key];
       if (!Number.isFinite(value)) return;
       event.preventDefault();
       value = Number(Math.max(z.limits.minimum, Math.min(z.limits.maximum, value)).toFixed(6));
-      this._previewMiniTarget(value);
-      void this._miniSetTarget(value);
+      this._previewMiniTarget(value, z);
+      void this._miniSetTarget(value, z.id);
     },
-    async _miniSetTarget(raw) {
-      const z = this._miniZone();
+    async _miniSetTarget(raw, zoneId) {
+      const z = zoneId ? this._zoneFor(zoneId) : this._miniZone();
       if (!this._miniCanSet(z)) return;
       const value = Number(raw), step = z.limits.step;
       if (!Number.isFinite(value) || value < z.limits.minimum || value > z.limits.maximum || step && Math.abs(value / step - Math.round(value / step)) > 1e-6) {
@@ -798,7 +806,9 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
           z.device_target = value;
           z.proposed_target = value;
           z.source = "manual";
-        } else await this._hass.callService("climate", "set_temperature", { temperature: value }, { entity_id: z.climate_entity });
+          if (this._config.thermostat_style === "hive" && z.receiver?.ownership) z.receiver.ownership.hardware = { mode: "manual" };
+        } else if (this._config.thermostat_style === "hive" && this._data.thermostat_mode_control) this._data = await this._hass.callWS({ type: "smart_heating_scheduler/control", entry_id: this._config.entry_id, zone_id: z.id, action: "thermostat_mode", payload: { mode: "manual", target: value } });
+        else await this._hass.callService("climate", "set_temperature", { temperature: value }, { entity_id: z.climate_entity });
         this._message = "Manual target sent";
       } catch (error) {
         this._error = error.message || "Could not set the thermostat target.";
@@ -811,6 +821,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
     _mini() {
       const z = this._miniZone();
       if (!z) return `<div class="wrap mini"><h2>Heating zone unavailable</h2><p>Choose a valid zone in the card editor.</p></div>`;
+      if (this._config.thermostat_style === "hive") return `<div class="hive-mini">${this._hiveTile(z, true)}${this._error ? `<p class="error" role="alert">${escapeHTML(this._error)}</p>` : ""}<span class="mini-sr" role="status">${escapeHTML(this._message || "")}</span></div>${this._modal()}`;
       const p = z.smart?.policy, helper = this._hass?.states?.[p?.duration_helper]?.attributes;
       const max = Math.min(p?.boost_max_minutes || 120, helper?.max || 1440), min = Math.max(1, helper?.min || 1), durationStep = helper?.step || 1;
       const duration = this._boostInputs?.[z.id]?.minutes ?? p?.boost_minutes ?? 30;
@@ -830,6 +841,77 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       <div class="mini-boost" data-smart-zone="${escapeHTML(z.id)}"><input type="hidden" data-boost="target" value="${escapeHTML(p?.boost_target ?? "")}"><label class="mini-slider"><span class="mini-boost-label"><span class="mini-timer" aria-hidden="true">\u25F4</span><span>Boost time<output data-mini-minutes>${z.boost.active ? escapeHTML(remainingText(z.boost.until, this._now())) : escapeHTML(duration) + " minutes"}</output></span></span><input type="range" data-boost="minutes" aria-label="Boost duration" min="${min}" max="${max}" step="${durationStep}" value="${escapeHTML(duration)}" ${boostRestricted || z.boost.active || p?.boost_owner === "external" && !p.duration_helper ? "disabled" : ""}></label></div>
       <button type="button" class="mini-boost-button" data-action="smart-${z.boost.active ? "boost-cancel" : "boost-start"}" data-zone="${escapeHTML(z.id)}" ${boostDisabled ? "disabled" : ""}>${flame}${z.boost.active ? "Stop boost" : "Boost"}</button>
       ${this._error ? `<p class="error" role="alert">${escapeHTML(this._error)}</p>` : ""}<span class="mini-sr" role="status">${escapeHTML(this._message || "")}</span></section>${this._modal()}`;
+    }
+  };
+
+  // src/hive-ui.js
+  var radiator = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16v10H4zM7 12v6m5-6v6m5-6v6M3 14H1m19 0h3M7 7c3-2-2-3 1-5m4 5c3-2-2-3 1-5m4 5c3-2-2-3 1-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  var hiveUI = {
+    _hiveTile(z, compact = false) {
+      const native = z.receiver?.schedule_owner === "receiver", hardware = z.receiver?.ownership?.hardware;
+      const mode = native ? hardware?.mode : z.mode === "off" ? "off" : z.source === "manual" ? "manual" : "schedule";
+      const boosting = z.boost.active || mode === "boost", target = this._miniTargetZone === z.id && this._miniTarget !== null ? this._miniTarget : z.device_target;
+      const canSet = this._miniCanSet(z) && !boosting;
+      const blocked = !this._canEdit() || this._saving || this._data.observe_only && !this._config.demo || !z.enabled || ["unavailable", "unknown"].includes(z.mode) || ["unsupported", "error", "disabled"].includes(z.source) || !!z.error || native && !hardware?.mode;
+      const modeBlocked = blocked || !this._config.demo && !this._data.thermostat_mode_control;
+      const fill = Number.isFinite(target) ? Math.max(0, Math.min(270, (target - z.limits.minimum) / (z.limits.maximum - z.limits.minimum) * 270)) : 0;
+      const label = z.source === "occupied_comfort" ? "Occupied" : z.source === "preheat" ? "Preheating" : boosting ? "Boost" : native && !mode ? "Reading" : mode === "off" ? "Off" : mode === "manual" ? "Manual" : "Schedule";
+      const activity = mode === "off" ? "Heating off" : z.hvac_action === "heating" ? "Heating" : z.hvac_action === "idle" ? "Idle" : "Activity unknown";
+      const duration = this._boostInputs?.[z.id]?.minutes ?? z.smart?.policy?.boost_minutes ?? 30;
+      const boostTarget = this._boostInputs?.[z.id]?.target ?? z.smart?.policy?.boost_target;
+      const boostDisabled = !this._canBoost(z) || this._saving || !(z.boost.active ? z.boost.can_cancel : z.boost.can_start);
+      const context = z.source === "occupied_comfort" ? "Occupancy override" : z.source === "preheat" ? "Smart preheating" : z.source === "holiday" ? "Holiday" : this._data.observe_only && !this._config.demo ? "Observe only" : native ? "Schedule stored on receiver" : "Schedule managed by Home Assistant";
+      return `<section class="hive-thermostat ${mode === "off" ? "hive-off" : ""} ${compact ? "hive-compact" : ""}" aria-label="${escapeHTML(z.name)} thermostat">
+      <header class="hive-head"><div class="hive-title"><span class="hive-icon">${radiator}</span><h2>${escapeHTML(compact ? this._config.title || z.name : z.name)}</h2></div><span class="hive-badge ${boosting ? "hive-warm" : ""}" aria-label="Thermostat mode ${escapeHTML(label)}">${escapeHTML(label)}</span></header>
+      <div class="ring mini-dial hive-dial" data-mini-dial="${escapeHTML(z.id)}" role="slider" tabindex="${canSet ? "0" : "-1"}" aria-label="${escapeHTML(z.name)} target temperature dial" aria-valuemin="${z.limits.minimum}" aria-valuemax="${z.limits.maximum}" aria-valuenow="${escapeHTML(target ?? z.limits.minimum)}" aria-valuetext="${escapeHTML(this._temp(target, z.unit))}" aria-description="Room temperature ${escapeHTML(this._temp(z.current_temperature, z.unit))}. ${escapeHTML(activity)}" aria-disabled="${!canSet}" style="--fill:${fill}">
+        <svg class="mini-arc" viewBox="0 0 200 200" aria-hidden="true"><circle class="arc-track" cx="100" cy="100" r="85" stroke-dasharray="400.553 534.071"/><circle class="arc-value" data-mini-arc="${escapeHTML(z.id)}" cx="100" cy="100" r="85" stroke-dasharray="${fill / 360 * 534.071} 534.071"/></svg><span class="dial-thumb" aria-hidden="true"></span>
+        <div class="hive-current">${escapeHTML(this._temp(z.current_temperature, ""))}<sup>${escapeHTML(z.unit)}</sup></div>
+        <div class="hive-activity">${escapeHTML(activity)}${mode !== "off" ? ` \xB7 target <span data-mini-reading="${escapeHTML(z.id)}">${escapeHTML(this._temp(target, z.unit))}</span>` : ""}</div><div class="hive-room-label">${boosting ? "Temperature locked during boost" : "Room temperature"}</div>
+      </div>
+      <div class="hive-modes" role="group" aria-label="${escapeHTML(z.name)} heating mode">${[["schedule", "Schedule"], ["manual", "Manual"], ["off", "Off"]].map(([key, name]) => `<button type="button" data-action="${key === "schedule" ? "smart-resume" : "hive-mode"}" data-mode="${key}" data-zone="${escapeHTML(z.id)}" aria-pressed="${(mode === "boost" && z.receiver?.ownership?.lease ? "schedule" : mode) === key && !z.boost.active}" ${modeBlocked || z.boost.active && key !== "off" ? "disabled" : ""}>${name}</button>`).join("")}</div>
+      <div class="hive-footer"><button type="button" class="hive-boost" data-action="${z.boost.active ? "smart-boost-cancel" : "hive-boost"}" data-zone="${escapeHTML(z.id)}" ${boostDisabled ? "disabled" : ""}>${z.boost.active ? "\xD7 Stop boost \xB7 " + escapeHTML(remainingText(z.boost.until, this._now())) : "\u2668 Boost " + escapeHTML(duration) + " min \xB7 " + escapeHTML(this._temp(boostTarget, z.unit))}</button><button type="button" class="hive-more" data-action="hive-more" data-zone="${escapeHTML(z.id)}">More <span aria-hidden="true">\u203A</span></button></div>
+      <div class="hive-context" role="status">${escapeHTML(z.error ? "Check heating settings" : context)}</div></section>`;
+    },
+    _hiveDialog() {
+      const z = this._zoneFor(this._dialog.zone);
+      if (!z) return "";
+      if (this._dialog.kind === "hive-boost") return `<p>${escapeHTML(z.name)}</p>${this._smartBoostControls(z)}`;
+      return `<p>${escapeHTML(z.name)}</p><div class="fact-row"><span>Schedule controller</span><b>${z.receiver?.schedule_owner === "receiver" ? "Local receiver" : "Home Assistant"}</b></div><div class="fact-row"><span>Occupancy override</span><b>${z.smart?.policy?.comfort_target != null ? "Enabled \xB7 minimum " + escapeHTML(this._temp(z.smart.policy.comfort_target, z.unit)) : "Disabled"}</b></div><div class="fact-row"><span>Smart preheating</span><b>${z.insights?.settings?.preheat_enabled ? escapeHTML(z.insights?.preheat?.state || "Enabled") : "Disabled"}</b></div><p class="status-caption">${escapeHTML(z.reason || "")}</p><div class="toolbar"><button data-action="more" data-zone="${escapeHTML(z.id)}">Native thermostat</button>${this._config.layout !== "mini" ? `<button data-action="hive-schedule" data-zone="${escapeHTML(z.id)}">View schedule</button>` : this._config.dashboard_path?.startsWith("/") && !this._config.dashboard_path.startsWith("//") ? `<a class="shs-link" href="${escapeHTML(this._config.dashboard_path)}">Full scheduler \u2192</a>` : ""}<button data-action="close">Done</button></div>`;
+    },
+    async _hiveAction(action, data) {
+      const z = this._zoneFor(data.zone);
+      if (!z || this._saving) return;
+      if (action === "boost" || action === "more") {
+        this._dialog = { kind: "hive-" + action, zone: z.id };
+        this._focusDialog = true;
+        this._render();
+        return;
+      }
+      if (action === "schedule") {
+        this._dialog = null;
+        this._action("schedule", data);
+        return;
+      }
+      if (action !== "mode" || !this._canEdit() || !z.enabled || this._data.observe_only && !this._config.demo) return;
+      if (!["manual", "off"].includes(data.mode)) return;
+      const target = Math.max(z.limits.minimum, Math.min(z.limits.maximum, z.device_target ?? z.limits.minimum));
+      this._saving = true;
+      this._error = "";
+      this._render();
+      try {
+        if (this._config.demo) {
+          z.mode = data.mode === "off" ? "off" : "heat";
+          z.source = data.mode === "off" ? "off" : "manual";
+          z.device_target = target;
+          if (z.receiver?.ownership) z.receiver.ownership.hardware = { mode: data.mode };
+        } else this._data = await this._hass.callWS({ type: "smart_heating_scheduler/control", entry_id: this._config.entry_id, zone_id: z.id, action: "thermostat_mode", payload: { mode: data.mode, ...data.mode === "manual" ? { target } : {} } });
+        this._message = z.name + ": " + (data.mode === "off" ? "Off" : "Manual");
+      } catch (error) {
+        this._error = error.message || "Could not change thermostat mode.";
+      } finally {
+        this._saving = false;
+        this._render();
+      }
     }
   };
 
@@ -1481,6 +1563,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
     }
     _action(action, data = {}) {
+      if (action.startsWith("hive-")) {
+        void this._hiveAction(action.slice(5), data);
+        return;
+      }
       if (action.startsWith("receiver-")) {
         void this._receiverAction(action.slice(9), data);
         return;
@@ -1640,6 +1726,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }).join("")}</div>`;
     }
     _zoneCard(zone) {
+      if (this._config.thermostat_style === "hive") return this._hiveTile(zone);
       const current = zone.current_temperature, fill = typeof current === "number" ? Math.max(0, Math.min(270, (current - zone.limits.minimum) / (zone.limits.maximum - zone.limits.minimum) * 270)) : 0;
       const heating = zone.hvac_action === "heating";
       return `<section class="panel zone-card ${heating ? "" : "idle"}" aria-label="${escapeHTML(zone.name)} thermostat">
@@ -1693,7 +1780,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       if (!this._dialog) return "";
       const dialog = this._dialog;
       let content = "", title = "";
-      if (dialog.kind === "import-week") {
+      if (dialog.kind === "hive-boost" || dialog.kind === "hive-more") {
+        title = dialog.kind === "hive-boost" ? "Boost heating" : "Heating details";
+        content = this._hiveDialog();
+      } else if (dialog.kind === "import-week") {
         title = "Import schedule";
         content = this._importDialog();
       } else if (dialog.kind === "holiday-boost") {
@@ -1755,8 +1845,11 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
       this.shadowRoot.innerHTML = this._config.layout === "mini" && this._data?.zones?.length ? `<style>${styles}</style>${this._mini()}` : `<style>${styles}</style><div class="wrap"><div class="header"><div class="brand"><span class="brand-icon" aria-hidden="true">\u2668\uFE0E</span><div><h1>${escapeHTML(this._config.title)}</h1><p>Comfort, on your schedule.</p></div></div><span class="badge"><span class="dot" aria-hidden="true"></span>${this._config.demo ? "Design preview" : this._data?.observe_only === false ? "Heating control" : "Observe only"}</span></div><div class="preview-banner"><strong>${this._config.demo ? "Sample data" : this._data?.observe_only === false ? "Heating control enabled" : "Heating controls unchanged"}</strong> \xB7 ${this._config.demo ? "Disconnected from Home Assistant" : this._status === "connected" ? "Connected to scheduler" : this._status === "reconnecting" ? "Reconnecting\u2026" : "Waiting for scheduler"}</div><nav class="nav" aria-label="Heating views">${Object.entries(VIEWS).map(([key, [icon, name]]) => `<button type="button" data-action="nav" data-view="${key}" aria-current="${key === this._view ? "page" : "false"}"><span class="nav-icon" aria-hidden="true">${icon}</span><span class="nav-label">${name}</span><span class="nav-mobile-label">${{ dashboard: "Home", schedules: "Planner", automation: "Rules" }[key] || name}</span></button>`).join("")}</nav>${this._error ? `<div class="error" role="alert">${escapeHTML(this._error)}</div>` : ""}${this._message ? `<div class="success" role="status">${escapeHTML(this._message)}</div>` : ""}<main ${this._saving ? 'aria-busy="true"' : ""}>${content}</main></div>${this._modal()}`;
       if (this._dialog) {
-        this.shadowRoot.querySelector(".wrap").inert = true;
-        this.shadowRoot.querySelector(".wrap").setAttribute("aria-hidden", "true");
+        const background = this.shadowRoot.querySelector(".wrap,.hive-mini,.mini");
+        if (background) {
+          background.inert = true;
+          background.setAttribute("aria-hidden", "true");
+        }
       }
       if (this._focusDialog) {
         this._focusDialog = false;
@@ -1768,7 +1861,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
     }
   };
-  Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, insightsUI, transferUI, receiverUI);
+  Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, hiveUI, insightsUI, transferUI, receiverUI);
   var SmartHeatingSchedulerCardEditor = class extends HTMLElement {
     constructor() {
       super();
@@ -1822,7 +1915,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
     }
     _render() {
-      this.shadowRoot.innerHTML = `<style>${styles}</style><div class="editor"><label>Layout<select data-config="layout"><option value="full" ${this._config?.layout !== "mini" ? "selected" : ""}>Full scheduler</option><option value="mini" ${this._config?.layout === "mini" ? "selected" : ""}>Mini thermostat & boost</option></select></label><label>Scheduler<select data-config="entry_id"><option value="">Choose a scheduler</option>${this._entries.map((item) => `<option value="${escapeHTML(item.entry_id)}" ${this._config?.entry_id === item.entry_id ? "selected" : ""}>${escapeHTML(item.name)}</option>`).join("")}</select></label>${this._config?.layout === "mini" ? `<label>Heating zone<select data-config="zone_id"><option value="">First available zone</option>${(this._zones || []).map((z) => `<option value="${escapeHTML(z.id)}" ${this._config.zone_id === z.id ? "selected" : ""}>${escapeHTML(z.name)}</option>`).join("")}</select></label><label>Full scheduler dashboard path<input data-config="dashboard_path" value="${escapeHTML(this._config.dashboard_path || "")}" placeholder="/your-heating-dashboard"></label>` : ""}<label>Card title<input data-config="title" value="${escapeHTML(this._config?.title || "Heating Control")}"></label><label>Initial view<select data-config="view">${Object.entries(VIEWS).map(([key, [, name]]) => `<option value="${key}" ${(this._config?.view || "dashboard") === key ? "selected" : ""}>${name}</option>`).join("")}</select></label><label>Theme<select data-config="theme">${["auto", "dark", "light"].map((theme) => `<option value="${theme}" ${(this._config?.theme || "auto") === theme ? "selected" : ""}>${{ auto: "Follow Home Assistant", dark: "Dark", light: "Light" }[theme]}</option>`).join("")}</select></label>${this._failure ? '<p role="alert">Could not load schedulers. Check that the integration is available.</p>' : ""}</div>`;
+      this.shadowRoot.innerHTML = `<style>${styles}</style><div class="editor"><label>Layout<select data-config="layout"><option value="full" ${this._config?.layout !== "mini" ? "selected" : ""}>Full scheduler</option><option value="mini" ${this._config?.layout === "mini" ? "selected" : ""}>Mini thermostat & boost</option></select></label><label>Thermostat style<select data-config="thermostat_style"><option value="classic" ${this._config?.thermostat_style !== "hive" ? "selected" : ""}>Classic compact</option><option value="hive" ${this._config?.thermostat_style === "hive" ? "selected" : ""}>Hive inspired \xB7 modes and dial</option></select></label><label>Scheduler<select data-config="entry_id"><option value="">Choose a scheduler</option>${this._entries.map((item) => `<option value="${escapeHTML(item.entry_id)}" ${this._config?.entry_id === item.entry_id ? "selected" : ""}>${escapeHTML(item.name)}</option>`).join("")}</select></label>${this._config?.layout === "mini" ? `<label>Heating zone<select data-config="zone_id"><option value="">First available zone</option>${(this._zones || []).map((z) => `<option value="${escapeHTML(z.id)}" ${this._config.zone_id === z.id ? "selected" : ""}>${escapeHTML(z.name)}</option>`).join("")}</select></label><label>Full scheduler dashboard path<input data-config="dashboard_path" value="${escapeHTML(this._config.dashboard_path || "")}" placeholder="/your-heating-dashboard"></label>` : ""}<label>Card title<input data-config="title" value="${escapeHTML(this._config?.title || "Heating Control")}"></label><label>Initial view<select data-config="view">${Object.entries(VIEWS).map(([key, [, name]]) => `<option value="${key}" ${(this._config?.view || "dashboard") === key ? "selected" : ""}>${name}</option>`).join("")}</select></label><label>Theme<select data-config="theme">${["auto", "dark", "light"].map((theme) => `<option value="${theme}" ${(this._config?.theme || "auto") === theme ? "selected" : ""}>${{ auto: "Follow Home Assistant", dark: "Dark", light: "Light" }[theme]}</option>`).join("")}</select></label>${this._failure ? '<p role="alert">Could not load schedulers. Check that the integration is available.</p>' : ""}</div>`;
     }
   };
   if (!customElements.get("smart-heating-scheduler-card")) customElements.define("smart-heating-scheduler-card", SmartHeatingSchedulerCard);
