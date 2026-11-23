@@ -12,7 +12,7 @@ export function dialTemperature(limits,x,y,rect,unit='°C') {
 
 export const miniUI = {
   _miniZone() {if(this._dialDrag)return this._zoneFor(this._dialDrag.zone);return this._config.zone_id?this._data?.zones.find(z=>z.id===this._config.zone_id):this._zone();},
-  _miniCanSet(z) {return !!(z&&this._canEdit()&&!this._saving&&(this._config.demo||!this._data.observe_only)&&z.enabled&&z.mode==='heat'&&!z.boost.active&&z.receiver?.ownership?.hardware?.mode!=='boost'&&!z.smart?.external_operation&&!['holiday','unavailable','unsupported','error','disabled','boost_unknown','boost_handover'].includes(z.source)&&!z.error);},
+  _miniCanSet(z) {return !!(z&&this._canEdit()&&!this._saving&&(this._config.demo||!this._data.observe_only)&&z.enabled&&z.mode==='heat'&&!z.boost.active&&!['boost','off'].includes(z.receiver?.ownership?.hardware?.mode)&&!z.smart?.external_operation&&!['holiday','unavailable','unsupported','error','disabled','boost_unknown','boost_handover'].includes(z.source)&&!z.error);},
   _previewMiniTarget(value,z=this._miniZone()) {
     if(!z||value===null)return;
     this._miniTarget=value;this._miniTargetZone=z.id;

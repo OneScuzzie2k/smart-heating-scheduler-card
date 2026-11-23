@@ -439,3 +439,15 @@ test('Hive live mode actions require backend support and send explicit selected-
     assert.equal(calls.length,1);assert.equal(calls[0].zone_id,z.id);assert.equal(calls[0].action,'thermostat_mode');assert.equal(calls[0].payload.mode,'manual');
   }finally{h.close();}
 });
+
+
+test('fresh receiver Off disables Hive and classic dials despite a stale HA Heat state',async()=>{
+  for(const style of ['hive','classic']){
+    const h=await setup({demo:true,layout:'mini',thermostat_style:style});try{
+      const z=h.card._miniZone(),target=z.device_target;z.mode='heat';z.source='off';z.receiver={schedule_owner:'receiver',ownership:{hardware:{mode:'off'}}};h.card._render();
+      const dial=h.root.querySelector('[data-mini-dial]');assert.equal(dial.getAttribute('aria-disabled'),'true');
+      dial.dispatchEvent(new h.dom.window.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));await settle();assert.equal(z.device_target,target);
+      assert.equal(h.card._miniCanSet(z),false);
+    }finally{h.close();}
+  }
+});

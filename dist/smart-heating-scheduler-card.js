@@ -728,7 +728,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       return this._config.zone_id ? this._data?.zones.find((z) => z.id === this._config.zone_id) : this._zone();
     },
     _miniCanSet(z) {
-      return !!(z && this._canEdit() && !this._saving && (this._config.demo || !this._data.observe_only) && z.enabled && z.mode === "heat" && !z.boost.active && z.receiver?.ownership?.hardware?.mode !== "boost" && !z.smart?.external_operation && !["holiday", "unavailable", "unsupported", "error", "disabled", "boost_unknown", "boost_handover"].includes(z.source) && !z.error);
+      return !!(z && this._canEdit() && !this._saving && (this._config.demo || !this._data.observe_only) && z.enabled && z.mode === "heat" && !z.boost.active && !["boost", "off"].includes(z.receiver?.ownership?.hardware?.mode) && !z.smart?.external_operation && !["holiday", "unavailable", "unsupported", "error", "disabled", "boost_unknown", "boost_handover"].includes(z.source) && !z.error);
     },
     _previewMiniTarget(value, z = this._miniZone()) {
       if (!z || value === null) return;
@@ -851,7 +851,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       const native = z.receiver?.schedule_owner === "receiver", hardware = z.receiver?.ownership?.hardware;
       const mode = native ? hardware?.mode : z.mode === "off" ? "off" : z.source === "manual" ? "manual" : "schedule";
       const boosting = z.boost.active || mode === "boost", target = this._miniTargetZone === z.id && this._miniTarget !== null ? this._miniTarget : z.device_target;
-      const canSet = this._miniCanSet(z) && !boosting;
+      const canSet = this._miniCanSet(z) && !boosting && mode !== "off";
       const blocked = !this._canEdit() || this._saving || this._data.observe_only && !this._config.demo || !z.enabled || ["unavailable", "unknown"].includes(z.mode) || ["unsupported", "error", "disabled"].includes(z.source) || !!z.error || native && !hardware?.mode;
       const modeBlocked = blocked || !this._config.demo && !this._data.thermostat_mode_control;
       const fill = Number.isFinite(target) ? Math.max(0, Math.min(270, (target - z.limits.minimum) / (z.limits.maximum - z.limits.minimum) * 270)) : 0;
