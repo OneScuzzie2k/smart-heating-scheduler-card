@@ -2,7 +2,7 @@
 
 The `feature/receiver-schedule-foundation` branch is a development checkpoint.
 Use it only with the matching integration branch. It is not a replacement for
-the stable release and does not move schedule ownership to the receiver.
+the stable release. Receiver ownership requires the explicit dev.3 handover below.
 
 The admin-only Settings disclosure appears when the backend supplies receiver
 status. It can read a complete native timetable, preview a saved HA week, download
@@ -39,3 +39,25 @@ separately. Status updates cannot erase a receiver error or replace new timer
 progress with a cached preview. Restore paused controllers and enable the zone
 only after confirming the original hold is restored. These tools do not enable
 permanent native schedule ownership or alter ordinary mini-card permissions.
+
+
+## Clock, transition and owner checkpoint 0.6.0-dev.3
+
+Use the matching backend. Clock and schedule transitions contains fresh Time-cluster
+readback, explicit synchronization of UTC/timezone/active-or-next DST rules, and a
+five-minute lower-temperature two-boundary test. Pause the zone and competing hold
+controllers for writes. A missed boundary remains unproven even if restoration succeeds.
+
+Schedule controller enables a verified receiver only after its timer, both transitions,
+clock and desired copied timetable pass backend checks. Re-enable the zone afterwards.
+Preheating, occupancy, holidays and profiles stay in their existing configurable UI.
+Schedule-origin overrides use finite renewable hardware leases. Manual/Off boosts and
+frost-while-Off restoration still require HA, as explained before handover.
+
+A native zone's Save week writes and verifies its receiver first. To adopt a physical
+schedule edit, pause the zone, Read receiver timetable, review it and use the exact
+import acknowledgement. Partial writes stay unresolved, never silently switching to
+HA control. Return to HA scheduling before a whole-zone import or downgrading.
+
+The full dashboard shows actual native receiver mode separately from the HA rule.
+Mini cards retain their compact layout and household boost permissions.

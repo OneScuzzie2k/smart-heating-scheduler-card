@@ -361,3 +361,22 @@ test('a boost arriving during dial drag immediately locks the mini card without 
     z.boost.active=false;z.smart.boost=null;z.source='schedule';h.card._receive(next);assert.equal(h.root.querySelector('[data-mini-dial]').getAttribute('aria-disabled'),'false');
   }finally{h.close();}
 });
+
+test('receiver ownership and clock writes require a paused zone and their exact acknowledgement',async()=>{
+  const h=await setup();try{
+    const z=h.card._zone(),calls=[];h.card._config.demo=false;h.card._status='connected';h.card._view='settings';z.enabled=true;z.receiver={state:'verified',handover_available:true};
+    h.card._hass={connection:{connected:true},callWS:async request=>{calls.push(request);return {...z.receiver};}};
+    h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-enable_owner"]').disabled,true);
+    z.enabled=false;h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-enable_owner"]').disabled,true);
+    const input=h.root.querySelector('[data-receiver-extra-ack="enable_owner"]');input.value='USE RECEIVER SCHEDULE';input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
+    click(h.root,'receiver-enable_owner');await settle();assert.deepEqual({...calls[0].payload},{revision:z.revision,acknowledgement:'USE RECEIVER SCHEDULE'});
+    const sync=h.root.querySelector('[data-receiver-extra-ack="synchronize_clock"]');sync.value='SYNCHRONIZE RECEIVER CLOCK';sync.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));click(h.root,'receiver-synchronize_clock');await settle();assert.equal(calls[1].action,'synchronize_clock');assert.deepEqual({...calls[1].payload},{acknowledgement:'SYNCHRONIZE RECEIVER CLOCK'});
+  }finally{h.close();}
+});
+test('receiver transition summaries replace stale preparations without implying qualification passed',async()=>{
+  const h=await setup();try{
+    const z=h.card._zone();h.card._config.demo=false;h.card._status='connected';h.card._view='settings';z.receiver={state:'verified',transition:{state:'restored',updated_at:'2026-11-23T12:20:00Z',first_observed:false,second_observed:true,restoration_verified:true,error:'First boundary missed'}};
+    h.card._receiverRecords={[h.card._receiverKey()]:{state:'verified',transition:{state:'prepared',updated_at:'2026-11-23T12:10:00Z'}}};
+    h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-start_transition"]'),null);assert.match(h.root.textContent,/Lower target observed: not yet/);assert.match(h.root.textContent,/First boundary missed/);assert.equal(h.root.querySelector('[data-action="receiver-enable_owner"]').disabled,true);
+  }finally{h.close();}
+});
