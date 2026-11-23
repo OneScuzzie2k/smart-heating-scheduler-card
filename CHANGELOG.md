@@ -1,4 +1,11 @@
-# 0.6.0-dev.1 — receiver timetable review (unreleased)
+# 0.6.0-dev.2 — guarded hardware timer test
+
+- Collapsed admin timer-test tools: inspect native mode, prepare, explicitly acknowledge, observe and restore.
+- Display hardware expiry, scheduled-target matching and original-hold restoration as separate results.
+- Keep receiver errors visible across status updates and name the zone in operation messages.
+- Everyday thermostat/mini controls and the stable releases remain unchanged; this is a supervised development checkpoint.
+
+# 0.6.0-dev.1 — receiver timetable review
 
 - Optional admin disclosure for reading, comparing and backing up receiver timetables with the matching development integration.
 - Shows changed days before a copy. Requires a disabled zone and typed acknowledgement; restore uses a fresh preview.

@@ -47,6 +47,38 @@ test('receiver failures preserve schedule drafts and do not report an unverified
     assert.match(h.root.textContent,/read incomplete: 1\/7 days/);assert.doesNotMatch(h.root.textContent,/Complete seven-day receiver timetable read/);
   }finally{h.close();}
 });
+test('native timer test requires a disabled zone and typed acknowledgement and sends no arbitrary mode parameters',async()=>{
+  const h=await setup();try{
+    const z=h.card._zone(),calls=[];h.card._config.demo=false;h.card._status='connected';h.card._view='settings';z.enabled=true;z.receiver={state:'read_complete'};
+    const q={id:'bounded',state:'prepared',original:{target:1600},expires_at:new Date(Date.now()+600000).toISOString(),updated_at:new Date().toISOString(),observations:[]};
+    h.card._hass={connection:{connected:true},callWS:async request=>{calls.push(request);return {state:'read_complete',qualification:structuredClone(q)};}};
+    h.card._render();click(h.root,'receiver-prepare_test');await settle();assert.deepEqual(calls.map(c=>c.action),['prepare_test']);
+    assert.equal(h.root.querySelector('[data-action="receiver-start_test"]').disabled,true);
+    z.enabled=false;h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-start_test"]').disabled,true);
+    const input=h.root.querySelector('[data-receiver-test-ack]');input.value='TEST RECEIVER TIMER';input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
+    click(h.root,'receiver-start_test');await settle();assert.equal(calls[1].action,'start_test');
+    assert.deepEqual({...calls[1].payload},{test_id:'bounded',acknowledgement:'TEST RECEIVER TIMER'});
+    assert.match(h.card._message,new RegExp(z.name));assert.equal(h.root.querySelector('[data-receiver-test-ack]').value,'');
+  }finally{h.close();}
+});
+test('receiver errors stay visible across status snapshots and clear after a successful inspection',async()=>{
+  const h=await setup();try{
+    const z=h.card._zone();h.card._config.demo=false;h.card._status='connected';h.card._view='settings';z.receiver={state:'not_read'};
+    h.card._hass={connection:{connected:true},callWS:async()=>{throw Error('Receiver not available');}};
+    h.card._render();click(h.root,'receiver-inspect');await settle();h.card._receive(structuredClone(h.card._data));
+    assert.match(h.root.textContent,/Receiver not available/);
+    h.card._hass.callWS=async()=>({state:'not_read',hardware:{state:{mode:'manual',target:1600}}});
+    click(h.root,'receiver-inspect');await settle();assert.doesNotMatch(h.root.textContent,/Receiver not available/);
+  }finally{h.close();}
+});
+test('live timer progress supersedes cached preview and restoration never implies natural expiry passed',async()=>{
+  const h=await setup();try{
+    const z=h.card._zone();h.card._config.demo=false;h.card._status='connected';h.card._view='settings';z.receiver={state:'read_complete',qualification:{state:'restored',updated_at:'2026-11-23T12:03:00Z',expiry_passed:false,restoration_verified:true,schedule_target_verified:false,result:'expiry_failed'}};
+    h.card._receiverRecords={[h.card._receiverKey()]:{state:'read_complete',qualification:{id:'old',state:'prepared',updated_at:'2026-11-23T12:00:00Z',original:{target:1600},expires_at:'2099-01-01T00:00:00Z'}}};
+    h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-start_test"]'),null);
+    assert.match(h.root.textContent,/Hardware expiry observed: not proven/);assert.match(h.root.textContent,/Original Manual hold restored: verified/);
+  }finally{h.close();}
+});
 test('all four views render with sample data explicitly labelled',async()=>{const h=await setup();try{for(const view of ['dashboard','schedules','automation','settings']){click(h.root,'nav',`[data-view="${view}"]`);assert.match(h.root.textContent,/Sample data/);assert.equal(h.root.querySelector('[aria-current="page"]').dataset.view,view);}assert.equal(h.card.getGridOptions().columns,12);}finally{h.close();}});
 test('editable period, undo, unsaved guard and demo save are connected',async()=>{const h=await setup();try{click(h.root,'nav','[data-view="schedules"]');click(h.root,'edit','[data-day="mon"][data-index="1"]');const temp=h.root.querySelector('[data-field="temperature"]');temp.value='21';temp.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));h.root.querySelector('form').dispatchEvent(new h.dom.window.Event('submit',{bubbles:true,cancelable:true}));assert.ok(h.card._draft);assert.equal(h.card._draft.mon[1].temperature,21);click(h.root,'nav','[data-view="dashboard"]');assert.match(h.root.querySelector('[role="dialog"]').textContent,/Unsaved/);click(h.root,'close');assert.equal(h.card._view,'schedules');click(h.root,'undo');assert.equal(h.card._draft.mon[1].temperature,20);click(h.root,'save');await new Promise(r=>setTimeout(r,0));assert.equal(h.card._draft,null);assert.match(h.root.textContent,/Saved to this demo only/);}finally{h.close();}});
 test('malicious names and labels are text, never executable markup',async()=>{const h=await setup();try{h.card._data.zones[0].name='<img src=x onerror=alert(1)>';h.card._data.zones[0].week.mon[1].label='<script>bad()</script>';h.card._render();assert.equal(h.root.querySelector('img'),null);assert.equal(h.root.querySelector('script'),null);assert.match(h.root.textContent,/<img/);}finally{h.close();}});
