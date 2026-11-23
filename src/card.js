@@ -1,5 +1,6 @@
 import {DAYS, DAY_NAMES, clone, escapeHTML as e, minutes, validateWeek, editPeriod, addPeriod, deletePeriod, copyDay, localParts, periodIndex, demoSnapshot, remainingText} from './model.js';
 import {transferUI} from './transfer-ui.js';
+import {receiverUI} from './receiver-ui.js';
 import {insightsUI, demoInsights} from './insights-ui.js';
 import {styles} from './styles.js';
 import {occupancyUI} from './occupancy-ui.js';
@@ -54,6 +55,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     });
     this.shadowRoot.addEventListener('input', event => {
       const target=event.target;
+      this._receiverInput(target);
       this._featureInput(target);
       if(target.hasAttribute('data-import-text')&&this._dialog?.kind==='import-week'){this._dialog.text=target.value;this._dialog.week=null;this._dialog.configuration=null;this._dialog.ack=false;}
       if(target.hasAttribute('data-new-profile')){this._newProfileNames ||= {};this._newProfileNames[this._zone().id]=target.value;}
@@ -202,6 +204,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     } finally { this._saving = false; this._render(); }
   }
   _action(action, data = {}) {
+    if(action.startsWith('receiver-')){void this._receiverAction(action.slice(9),data);return;}
     if(action.startsWith('transfer-')){void this._transferAction(action.slice(9));return;}
     if(action.startsWith('feature-')){void this._featureAction(action.slice(8),data);return;}
     if(action==='occupancy-settings'){this._guard(()=>{this._selectZone(data.zone);this._view='settings';this._render();});return;}
@@ -292,7 +295,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
     const z=this._zone();
     const zoneDetails=`<div class="fact-row"><span>Thermostat</span><b>${e(z.climate_entity||'Sample thermostat')}</b></div><div class="fact-row"><span>Reviewed limits</span><b>${e(this._temp(z.limits.minimum))} – ${e(this._temp(z.limits.maximum))}</b></div><div class="fact-row"><span>Temperature step</span><b>${z.limits.step?e(this._temp(z.limits.step)):'Not reported'}</b></div><div class="fact-row"><span>Manual temperature</span><b>${e({next_period:'Until next period',duration:`${z.manual_minutes} minutes`,until_resume:'Until resumed'}[z.manual_policy])}</b></div>${!this._config.demo&&this._data.can_edit?'<a class="shs-link" href="/config/integrations/integration/smart_heating_scheduler">Manage thermostat and limits →</a>':''}`;
     const appearance=`<section class="panel"><h3>Card appearance</h3><label>Theme<select data-action="theme-select" aria-label="Card theme">${['auto','dark','light'].map(t=>`<option value="${t}" ${this._config.theme===t?'selected':''}>${{auto:'Follow Home Assistant',dark:'Dark',light:'Light'}[t]}</option>`).join('')}</select></label></section>`;
-    return `<div class="zone-picker"><div><div class="eyebrow">Make this zone work for you</div><h2>Settings</h2></div><div class="zone-management">${this._selector()}${this._addZoneShortcut()}</div></div><p class="zone-help muted">Add a zone for each thermostat in Home Assistant, then choose it here.</p><div class="settings-stack">${this._disclosure('setup-guide','Guided zone setup','<ol><li>Choose a thermostat and zone name.</li><li>Review its temperature limits and starting all-day schedule.</li><li>Choose boost, occupancy, preheating and frost options.</li><li>Review the summary. New zones start disabled; enable them after reviewing their schedule.</li></ol><p class="muted">Use Add heating zone above, then Guided setup. Existing zones keep their current settings.</p>','Four steps for adding a thermostat')}${this._disclosure('zone','Zone settings',zoneDetails,`${z.name} · thermostat, limits and manual override`)}<div class="settings-section-title"><h3>Smart features</h3><p class="muted">Optional features for this zone. Open a feature to adjust its options.</p></div><div class="settings-grid">${this._occupancySettings()}${this._preheatSettings()}</div>${this._disclosure('frost','Frost protection',this._frostSettings(),this._zone().insights?.settings.frost_enabled?'Enabled for this zone':'Optional minimum temperature · disabled')}${this._transferPanel()}${this._disclosure('advanced','Advanced settings',`<div class="settings-grid">${this._smartSettings()}${appearance}</div>`,'Boost adapters, heating control mode and appearance')}</div>`;
+    return `<div class="zone-picker"><div><div class="eyebrow">Make this zone work for you</div><h2>Settings</h2></div><div class="zone-management">${this._selector()}${this._addZoneShortcut()}</div></div><p class="zone-help muted">Add a zone for each thermostat in Home Assistant, then choose it here.</p><div class="settings-stack">${this._disclosure('setup-guide','Guided zone setup','<ol><li>Choose a thermostat and zone name.</li><li>Review its temperature limits and starting all-day schedule.</li><li>Choose boost, occupancy, preheating and frost options.</li><li>Review the summary. New zones start disabled; enable them after reviewing their schedule.</li></ol><p class="muted">Use Add heating zone above, then Guided setup. Existing zones keep their current settings.</p>','Four steps for adding a thermostat')}${this._disclosure('zone','Zone settings',zoneDetails,`${z.name} · thermostat, limits and manual override`)}<div class="settings-section-title"><h3>Smart features</h3><p class="muted">Optional features for this zone. Open a feature to adjust its options.</p></div><div class="settings-grid">${this._occupancySettings()}${this._preheatSettings()}</div>${this._disclosure('frost','Frost protection',this._frostSettings(),this._zone().insights?.settings.frost_enabled?'Enabled for this zone':'Optional minimum temperature · disabled')}${this._transferPanel()}${this._receiverPanel()}${this._disclosure('advanced','Advanced settings',`<div class="settings-grid">${this._smartSettings()}${appearance}</div>`,'Boost adapters, heating control mode and appearance')}</div>`;
   }
   _modal() {
     if (!this._dialog) return '';
@@ -347,7 +350,7 @@ export class SmartHeatingSchedulerCard extends HTMLElement {
   }
 }
 
-Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, insightsUI, transferUI);
+Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, insightsUI, transferUI, receiverUI);
 
 export class SmartHeatingSchedulerCardEditor extends HTMLElement {
   constructor() { super(); this.attachShadow({mode:'open'}); this._entries=[]; this.shadowRoot.addEventListener('change',event=>{const key=event.target.dataset.config; if(!key)return; this._config={...this._config,[key]:event.target.value};if(key==='entry_id'){delete this._config.zone_id;this._zoneEntry=null;}this._loadZones();this._render(); this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));}); }

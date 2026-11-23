@@ -1,3 +1,10 @@
+# 0.6.0-dev.1 — receiver timetable review (unreleased)
+
+- Optional admin disclosure for reading, comparing and backing up receiver timetables with the matching development integration.
+- Shows changed days before a copy. Requires a disabled zone and typed acknowledgement; restore uses a fresh preview.
+- Existing thermostats, ordinary household boost controls and mini cards retain their current behaviour.
+- This stage does not enable receiver Schedule mode or introduce the new dial design.
+
 # 0.5.4 — lock boost temperatures clearly
 
 - Disable full-card boost target/duration inputs during a running boost and show its active target. Stop boost remains available.

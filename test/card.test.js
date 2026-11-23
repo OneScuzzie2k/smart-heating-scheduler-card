@@ -11,6 +11,42 @@ async function setup(config={demo:true,theme:'dark'}) {
   return {dom,card,root:card.shadowRoot,close:()=>dom.window.close()};
 }
 const click=(root,action,extra='')=>{const node=root.querySelector(`[data-action="${action}"]${extra}`);assert.ok(node,action);assert.equal(node.disabled,false,action+' is enabled');node.click();};
+test('receiver tools require a live admin and remain absent from existing integrations and mini cards',async()=>{
+  const h=await setup();try{
+    h.card._view='settings';h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-read"]'),null);
+    h.card._config.demo=false;h.card._status='connected';h.card._zone().receiver={state:'not_read'};h.card._render();
+    assert.ok(h.root.querySelector('[data-action="receiver-read"]'));
+    h.card._data.can_edit=false;h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-read"]'),null);
+    h.card._data.can_edit=true;h.card._config.layout='mini';h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-read"]'),null);
+  }finally{h.close();}
+});
+test('receiver preview never writes and a disabled zone plus typed acknowledgement is required',async()=>{
+  const h=await setup();try{
+    const calls=[],z=h.card._zone();h.card._config.demo=false;h.card._status='connected';h.card._view='settings';z.receiver={state:'not_read'};z.enabled=true;
+    const week=Object.fromEntries(['mon','tue','wed','thu','fri','sat','sun'].map(day=>[day,[{minute:0,centi:1600}]]));
+    const record={state:'preview',snapshot:{at:'2026-11-23T12:00:00Z',schedule:week},plan:{id:'reviewed',source:'ha_schedule',revision:z.revision,expires_at:new Date(Date.now()+600000).toISOString(),before:week,after:week,changed_days:[]},transactions:[]};
+    h.card._hass={connection:{connected:true},callWS:async request=>{calls.push(request);return structuredClone(record);}};
+    h.card._render();click(h.root,'receiver-prepare');await settle();
+    assert.deepEqual(calls.map(c=>c.action),['prepare']);assert.equal(calls[0].payload.revision,z.revision);
+    assert.equal(h.root.querySelector('[data-action="receiver-write"]').disabled,true);
+    assert.match(h.root.textContent,/HA currently runs this zone/);
+    z.enabled=false;h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-write"]').disabled,true);await h.card._receiverAction('write');assert.equal(calls.length,1);
+    const input=h.root.querySelector('[data-receiver-ack]');input.value='WRITE RECEIVER TIMETABLE';input.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));
+    click(h.root,'receiver-write');await settle();assert.equal(calls[1].action,'write');assert.equal(calls[1].payload.plan_id,'reviewed');assert.equal(calls[1].payload.acknowledgement,'WRITE RECEIVER TIMETABLE');
+    assert.match(h.root.textContent,/HA still owns scheduling/);
+    assert.equal(h.root.querySelector('[data-receiver-ack]').value,'');
+  }finally{h.close();}
+});
+test('receiver failures preserve schedule drafts and do not report an unverified copy as successful',async()=>{
+  const h=await setup();try{
+    const z=h.card._zone();h.card._config.demo=false;h.card._status='connected';h.card._view='settings';z.receiver={state:'not_read'};
+    let calls=0;h.card._hass={connection:{connected:true},callWS:async()=>{calls++;throw Error('Receiver read incomplete: 1/7 days');}};
+    h.card._draft=structuredClone(z.week);h.card._render();assert.equal(h.root.querySelector('[data-action="receiver-read"]').disabled,true);
+    await h.card._receiverAction('read');assert.equal(calls,0);assert.ok(h.card._draft);
+    h.card._draft=null;h.card._render();click(h.root,'receiver-read');await settle();assert.equal(calls,1);
+    assert.match(h.root.textContent,/read incomplete: 1\/7 days/);assert.doesNotMatch(h.root.textContent,/Complete seven-day receiver timetable read/);
+  }finally{h.close();}
+});
 test('all four views render with sample data explicitly labelled',async()=>{const h=await setup();try{for(const view of ['dashboard','schedules','automation','settings']){click(h.root,'nav',`[data-view="${view}"]`);assert.match(h.root.textContent,/Sample data/);assert.equal(h.root.querySelector('[aria-current="page"]').dataset.view,view);}assert.equal(h.card.getGridOptions().columns,12);}finally{h.close();}});
 test('editable period, undo, unsaved guard and demo save are connected',async()=>{const h=await setup();try{click(h.root,'nav','[data-view="schedules"]');click(h.root,'edit','[data-day="mon"][data-index="1"]');const temp=h.root.querySelector('[data-field="temperature"]');temp.value='21';temp.dispatchEvent(new h.dom.window.Event('input',{bubbles:true}));h.root.querySelector('form').dispatchEvent(new h.dom.window.Event('submit',{bubbles:true,cancelable:true}));assert.ok(h.card._draft);assert.equal(h.card._draft.mon[1].temperature,21);click(h.root,'nav','[data-view="dashboard"]');assert.match(h.root.querySelector('[role="dialog"]').textContent,/Unsaved/);click(h.root,'close');assert.equal(h.card._view,'schedules');click(h.root,'undo');assert.equal(h.card._draft.mon[1].temperature,20);click(h.root,'save');await new Promise(r=>setTimeout(r,0));assert.equal(h.card._draft,null);assert.match(h.root.textContent,/Saved to this demo only/);}finally{h.close();}});
 test('malicious names and labels are text, never executable markup',async()=>{const h=await setup();try{h.card._data.zones[0].name='<img src=x onerror=alert(1)>';h.card._data.zones[0].week.mon[1].label='<script>bad()</script>';h.card._render();assert.equal(h.root.querySelector('img'),null);assert.equal(h.root.querySelector('script'),null);assert.match(h.root.textContent,/<img/);}finally{h.close();}});

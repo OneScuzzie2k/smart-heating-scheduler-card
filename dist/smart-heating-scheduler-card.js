@@ -20,10 +20,10 @@
     if (!limits || !Number.isFinite(limits.minimum) || !Number.isFinite(limits.maximum) || limits.minimum >= limits.maximum || limits.step != null && (!Number.isFinite(limits.step) || limits.step <= 0)) throw Error("Review this zone\u2019s temperature limits.");
     if (!week || typeof week !== "object" || Object.keys(week).sort().join() !== [...DAYS].sort().join()) throw Error("A schedule needs all seven days.");
     for (const day of DAYS) {
-      const periods = week[day];
-      if (!Array.isArray(periods) || periods.length < 1 || periods.length > 96) throw Error("Use 1\u201396 periods per day.");
+      const periods2 = week[day];
+      if (!Array.isArray(periods2) || periods2.length < 1 || periods2.length > 96) throw Error("Use 1\u201396 periods per day.");
       let previous = -1;
-      for (const period of periods) {
+      for (const period of periods2) {
         if (!period || Object.keys(period).some((k) => !["start", "temperature", "label"].includes(k))) throw Error("Invalid period fields.");
         const start = minutes(period.start);
         if (start <= previous || previous === -1 && start !== 0) throw Error("Start at 00:00 and keep period times in order.");
@@ -38,24 +38,24 @@
   }
   function editPeriod(week, day, index, edit, limits) {
     if (String(edit.temperature).trim() === "") throw Error("Enter a target temperature.");
-    const result = clone(week), periods = result[day];
+    const result = clone(week), periods2 = result[day];
     const start = minutes(edit.start), end = minutes(edit.end, true);
-    const previous = index ? minutes(periods[index - 1].start) : -1;
-    const followingEnd = index + 2 < periods.length ? minutes(periods[index + 2].start) : 1440;
-    if (index === 0 && start !== 0 || start <= previous || end <= start || end > followingEnd || index + 2 < periods.length && end === followingEnd) throw Error("Keep this period within its neighbours and start the day at 00:00.");
-    if (index === periods.length - 1 && end !== 1440) throw Error("The final period must end at 24:00.");
-    if (index < periods.length - 1 && end === 1440) throw Error("Leave time for the following period.");
-    periods[index] = { start: edit.start, temperature: Number(edit.temperature), label: edit.label };
-    if (index < periods.length - 1) periods[index + 1].start = edit.end;
+    const previous = index ? minutes(periods2[index - 1].start) : -1;
+    const followingEnd = index + 2 < periods2.length ? minutes(periods2[index + 2].start) : 1440;
+    if (index === 0 && start !== 0 || start <= previous || end <= start || end > followingEnd || index + 2 < periods2.length && end === followingEnd) throw Error("Keep this period within its neighbours and start the day at 00:00.");
+    if (index === periods2.length - 1 && end !== 1440) throw Error("The final period must end at 24:00.");
+    if (index < periods2.length - 1 && end === 1440) throw Error("Leave time for the following period.");
+    periods2[index] = { start: edit.start, temperature: Number(edit.temperature), label: edit.label };
+    if (index < periods2.length - 1) periods2[index + 1].start = edit.end;
     return validateWeek(result, limits);
   }
   function addPeriod(week, day, index, limits) {
-    const result = clone(week), periods = result[day];
-    if (periods.length >= 96) throw Error("This day already has 96 periods.");
-    const start = minutes(periods[index].start), end = index + 1 < periods.length ? minutes(periods[index + 1].start) : 1440;
+    const result = clone(week), periods2 = result[day];
+    if (periods2.length >= 96) throw Error("This day already has 96 periods.");
+    const start = minutes(periods2[index].start), end = index + 1 < periods2.length ? minutes(periods2[index + 1].start) : 1440;
     if (end - start < 2) throw Error("This period is too short to split.");
     const middle = Math.floor((start + end) / 2);
-    periods.splice(index + 1, 0, { start: timeText(middle), temperature: periods[index].temperature, label: "New period" });
+    periods2.splice(index + 1, 0, { start: timeText(middle), temperature: periods2[index].temperature, label: "New period" });
     return validateWeek(result, limits);
   }
   function deletePeriod(week, day, index, limits) {
@@ -77,8 +77,8 @@
     const get = (type) => parts.find((p) => p.type === type)?.value;
     return { day: get("weekday").slice(0, 3).toLowerCase(), minute: Number(get("hour")) * 60 + Number(get("minute")), time: `${get("hour")}:${get("minute")}` };
   }
-  function periodIndex(periods, minute) {
-    return periods.findLastIndex((period) => minutes(period.start) <= minute);
+  function periodIndex(periods2, minute) {
+    return periods2.findLastIndex((period) => minutes(period.start) <= minute);
   }
   function demoSnapshot() {
     const week = Object.fromEntries(DAYS.map((day) => [day, [
@@ -219,7 +219,80 @@
     },
     _importDialog() {
       const d = this._dialog;
-      return `<p>Import into <strong>${escapeHTML(this._zone().name)}</strong>. Choose an exported JSON file or paste its contents. No heating changes occur in this preview.</p><label>Schedule backup file<input type="file" accept=".json,application/json" data-import-file aria-label="Schedule backup file"></label><label>Backup JSON<textarea data-import-text aria-label="Backup JSON" rows="5">${escapeHTML(d.text)}</textarea></label>${this._dialogError ? `<div class="error" role="alert">${escapeHTML(this._dialogError)}</div>` : ""}${d.week ? `<div class="success" role="status">Validated for ${escapeHTML(this._zone().unit)} and this zone\u2019s limits. ${Object.values(d.week).reduce((n, p) => n + p.length, 0)} periods across seven days.</div><div class="import-preview">${Object.entries(d.week).map(([day, periods]) => `<div><b>${escapeHTML(day)}</b> ${periods.map((p) => `${escapeHTML(p.start)} \xB7 ${escapeHTML(p.temperature)}${escapeHTML(this._zone().unit)}`).join(" / ")}</div>`).join("")}</div>` : ""}${d.configuration ? `<p class="muted">This file also includes zone settings and entity references. Read the JSON above and check every boost script, timer and occupancy input. The thermostat mapping, reviewed limits and control mode stay unchanged.</p><label class="check"><input type="checkbox" data-import-ack ${d.ack ? "checked" : ""}>I reviewed all settings and entity mappings for this destination</label>${this._zone().enabled ? '<p class="error">Disable this zone in Manage thermostat and limits before restoring its settings.</p>' : ""}<button data-action="transfer-restore" class="primary" ${this._zone().enabled || !d.ack || this._saving ? "disabled" : ""}>Restore zone settings</button>` : ""}<div class="toolbar"><button data-action="close">Cancel</button><button data-action="transfer-preview">Validate & preview</button><button class="primary" data-action="transfer-apply" ${d.week ? "" : "disabled"}>Load into draft</button></div>`;
+      return `<p>Import into <strong>${escapeHTML(this._zone().name)}</strong>. Choose an exported JSON file or paste its contents. No heating changes occur in this preview.</p><label>Schedule backup file<input type="file" accept=".json,application/json" data-import-file aria-label="Schedule backup file"></label><label>Backup JSON<textarea data-import-text aria-label="Backup JSON" rows="5">${escapeHTML(d.text)}</textarea></label>${this._dialogError ? `<div class="error" role="alert">${escapeHTML(this._dialogError)}</div>` : ""}${d.week ? `<div class="success" role="status">Validated for ${escapeHTML(this._zone().unit)} and this zone\u2019s limits. ${Object.values(d.week).reduce((n, p) => n + p.length, 0)} periods across seven days.</div><div class="import-preview">${Object.entries(d.week).map(([day, periods2]) => `<div><b>${escapeHTML(day)}</b> ${periods2.map((p) => `${escapeHTML(p.start)} \xB7 ${escapeHTML(p.temperature)}${escapeHTML(this._zone().unit)}`).join(" / ")}</div>`).join("")}</div>` : ""}${d.configuration ? `<p class="muted">This file also includes zone settings and entity references. Read the JSON above and check every boost script, timer and occupancy input. The thermostat mapping, reviewed limits and control mode stay unchanged.</p><label class="check"><input type="checkbox" data-import-ack ${d.ack ? "checked" : ""}>I reviewed all settings and entity mappings for this destination</label>${this._zone().enabled ? '<p class="error">Disable this zone in Manage thermostat and limits before restoring its settings.</p>' : ""}<button data-action="transfer-restore" class="primary" ${this._zone().enabled || !d.ack || this._saving ? "disabled" : ""}>Restore zone settings</button>` : ""}<div class="toolbar"><button data-action="close">Cancel</button><button data-action="transfer-preview">Validate & preview</button><button class="primary" data-action="transfer-apply" ${d.week ? "" : "disabled"}>Load into draft</button></div>`;
+    }
+  };
+
+  // src/receiver-ui.js
+  var acknowledgement = "WRITE RECEIVER TIMETABLE";
+  var time = (minute) => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+  var periods = (day) => day?.length ? day.map((p) => `${time(p.minute)} \xB7 ${p.centi === 0 || p.centi === 100 ? "Native Off" : `${p.centi / 100}\xB0C`}`).join(" / ") : "No transitions returned";
+  var receiverUI = {
+    _receiverKey(z = this._zone()) {
+      return `${this._config.entry_id}:${z.id}:${z.climate_entity}`;
+    },
+    _receiverPanel() {
+      const z = this._zone();
+      if (!z.receiver || !this._data.can_edit || this._config.demo) return "";
+      const record = this._receiverRecords?.[this._receiverKey()] || z.receiver, plan = record.plan;
+      const disabled = !this._canEdit() || this._saving || Boolean(this._draft || this._featureDraft);
+      const hasPlan = plan && plan.revision === z.revision && Date.parse(plan.expires_at) > Date.now();
+      const table = record.snapshot ? `<h3>Last complete receiver read</h3><div class="import-preview">${Object.entries(record.snapshot.schedule).map(([day, items]) => `<p><b>${escapeHTML(day)}</b> ${escapeHTML(periods(items))}</p>`).join("")}</div>${record.snapshot.import_warning ? `<p class="muted">${escapeHTML(record.snapshot.import_warning)}</p>` : ""}` : "";
+      const preview = plan ? `<h3>Reviewed copy \xB7 ${plan.source === "backup" ? "restore backup" : "saved HA week"}</h3><p>${plan.changed_days.length} changed days. Preview expires after ten minutes. Copying the timetable does not activate receiver Schedule mode.</p><div class="import-preview">${plan.changed_days.map((day) => `<p><b>${escapeHTML(day)}</b><br>Receiver: ${escapeHTML(periods(plan.before[day]))}<br>Proposed: ${escapeHTML(periods(plan.after[day]))}</p>`).join("") || "<p>The timetables already match.</p>"}</div>${z.enabled ? '<p class="muted">Hardware writes are unavailable while this zone\u2019s HA scheduling is enabled.</p>' : ""}<label>Type ${acknowledgement} to confirm<input data-receiver-ack aria-label="Confirm receiver timetable copy" autocomplete="off" value="${escapeHTML(this._receiverAcknowledgements?.[this._receiverKey()] || "")}" ${disabled ? "disabled" : ""}></label><button data-action="receiver-write" class="primary" ${disabled || z.enabled || !hasPlan || this._receiverAcknowledgements?.[this._receiverKey()] !== acknowledgement ? "disabled" : ""}>Copy reviewed timetable to receiver</button>` : "";
+      const backups = (record.transactions || []).map((t) => `<div class="fact-row"><span>${escapeHTML(t.started_at)} \xB7 ${escapeHTML(t.state)}</span><button data-action="receiver-restore" data-backup="${escapeHTML(t.id)}" ${disabled ? "disabled" : ""}>Preview original timetable</button></div>`).join("");
+      return this._disclosure("receiver", "Receiver schedule \xB7 development", `<p class="muted">HA currently runs this zone\u2019s schedule. Receiver ownership is not available in this development stage. Heating only: known single-channel Hive receivers through ZHA. Other thermostats keep their existing HA scheduling.</p><p role="status">${escapeHTML(record.error || record.state)} \xB7 ${escapeHTML(record.read_at || record.snapshot?.at || "Not read yet")}</p>${this._draft || this._featureDraft ? "<p>Save or discard your settings draft before reviewing a receiver copy.</p>" : ""}<div class="toolbar"><button data-action="receiver-read" ${disabled ? "disabled" : ""}>Read receiver timetable</button><button data-action="receiver-prepare" ${disabled ? "disabled" : ""}>Preview saved week on receiver</button><button data-action="receiver-export" ${disabled || !record.snapshot ? "disabled" : ""}>Download receiver backup</button></div>${table}${preview}${backups ? `<h3>Copy backups</h3>${backups}<p class="muted">The last five operations retain the original timetable. Restore requires a new preview, disabled zone and matching readback.</p>` : ""}`, "Read, compare and back up \xB7 HA remains in charge");
+    },
+    _receiverInput(target) {
+      if (!target.hasAttribute("data-receiver-ack")) return;
+      this._receiverAcknowledgements ||= {};
+      this._receiverAcknowledgements[this._receiverKey()] = target.value;
+      const plan = this._receiverRecords?.[this._receiverKey()]?.plan, z = this._zone();
+      const button2 = this.shadowRoot.querySelector('[data-action="receiver-write"]');
+      if (button2) button2.disabled = !this._canEdit() || this._saving || Boolean(this._draft || this._featureDraft) || z.enabled || !plan || plan.revision !== z.revision || Date.parse(plan.expires_at) <= Date.now() || target.value !== acknowledgement;
+    },
+    async _receiverAction(action, data = {}) {
+      if (!this._canEdit() || this._saving || this._config.demo || this._draft || this._featureDraft) return;
+      const z = this._zone(), key = this._receiverKey(z), record = this._receiverRecords?.[key], generation = this._generation;
+      if (action === "export") {
+        if (!record?.snapshot) return;
+        const url = URL.createObjectURL(new Blob([JSON.stringify({ format: "smart-heating-scheduler/receiver", version: 1, ...record }, null, 2)], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "heating-receiver-backup.json";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1e3);
+        return;
+      }
+      const payload = action === "prepare" ? { revision: z.revision } : action === "restore" ? { revision: z.revision, backup_id: data.backup } : action === "write" ? { plan_id: record?.plan?.id, acknowledgement: this._receiverAcknowledgements?.[key] || "" } : {};
+      if (action === "write" && (z.enabled || !payload.plan_id || payload.acknowledgement !== acknowledgement)) {
+        this._error = "Disable this zone and confirm the current reviewed timetable before copying.";
+        this._render();
+        return;
+      }
+      this._saving = true;
+      this._error = "";
+      this._message = "";
+      this._render();
+      try {
+        const result = await this._hass.callWS({ type: "smart_heating_scheduler/receiver", entry_id: this._config.entry_id, zone_id: z.id, action: action === "restore" ? "prepare_restore" : action, payload });
+        if (generation !== this._generation) return;
+        this._receiverRecords ||= {};
+        this._receiverRecords[key] = result;
+        this._receiverAcknowledgements ||= {};
+        this._receiverAcknowledgements[key] = "";
+        this._message = action === "write" ? "Receiver timetable verified. HA still owns scheduling." : action === "read" ? "Complete seven-day receiver timetable read." : "Preview prepared. Receiver timetable is unchanged.";
+      } catch (error) {
+        if (generation === this._generation) {
+          if (action === "write") {
+            delete this._receiverRecords?.[key];
+            delete this._receiverAcknowledgements?.[key];
+          }
+          this._error = `${error.message || "Receiver operation failed."}${action === "write" ? " Copy is unverified. Read the receiver before preparing another copy." : ""}`;
+        }
+      } finally {
+        this._saving = false;
+        this._render();
+      }
     }
   };
 
@@ -286,11 +359,11 @@
       const disabled = !this._canEdit() || this._saving;
       const names = Object.keys(s.profiles);
       if (!names.includes(this._profileName)) this._profileName = names[0] || "";
-      const periods = s.profiles[this._profileName] || [];
+      const periods2 = s.profiles[this._profileName] || [];
       const choices = Object.entries(this._hass?.states || {}).filter(([id]) => id.startsWith("calendar.") || id.startsWith("binary_sensor.")).map(([id, state]) => `<option value="${escapeHTML(id)}">${escapeHTML(state.attributes.friendly_name || id)}</option>`).join("");
       return `<section class="panel feature-panel"><div class="section-head"><div><div class="eyebrow">Optional day profiles</div><h2>Calendar & workdays</h2></div><span class="profile-tag">${escapeHTML(z.insights.active_profile || "Weekly schedule")}</span></div><p class="muted">Keep your normal week, and use a different day profile for bank holidays, days off or working at home. Calendar rules apply to the whole local day. First matching rule wins, then Workday, then your weekly schedule.</p>
     <fieldset ${disabled ? "disabled" : ""}><datalist id="feature-entities">${choices}</datalist><div class="feature-columns"><div><h3>Day profiles</h3><label>Edit profile<select data-action="feature-profile-select" aria-label="Edit profile">${names.length ? names.map((name) => `<option ${name === this._profileName ? "selected" : ""}>${escapeHTML(name)}</option>`).join("") : "<option>No profiles yet</option>"}</select></label>
-    ${periods.length ? this._timeline(periods, this._day, false) : ""}<div class="profile-periods">${periods.map((p, i) => `<div class="profile-period"><label>Start<input aria-label="Profile period ${i + 1} start" data-feature="start" data-profile-row="${i}" type="time" value="${escapeHTML(p.start)}" ${i === 0 ? "readonly" : ""}></label><label>Target (${escapeHTML(z.unit)})<input aria-label="Profile period ${i + 1} target" data-feature="temperature" data-profile-row="${i}" type="number" min="${z.limits.minimum}" max="${z.limits.maximum}" step="${z.limits.step || "any"}" value="${p.temperature}"></label><label>Name<input aria-label="Profile period ${i + 1} name" data-feature="label" data-profile-row="${i}" maxlength="80" value="${escapeHTML(p.label || "")}"></label>${i ? btn("Remove", "remove-period", disabled, `data-index="${i}" aria-label="Remove profile period ${i + 1}"`) : ""}</div>`).join("")}</div><div class="toolbar">${names.length ? btn("Add period", "add-period", disabled) : ""}${names.length ? btn("Delete profile", "delete-profile", disabled) : ""}</div><label>New profile name<input data-new-profile value="${escapeHTML(this._newProfileNames?.[z.id] || "")}" maxlength="40" placeholder="e.g. Day off" aria-label="New profile name"></label>${btn("Create from selected day", "create-profile", disabled)}<p class="muted">Copies ${escapeHTML(this._day.toUpperCase())} from this zone\u2019s saved week. Edit the copy here; your weekly schedule stays separate.</p></div>
+    ${periods2.length ? this._timeline(periods2, this._day, false) : ""}<div class="profile-periods">${periods2.map((p, i) => `<div class="profile-period"><label>Start<input aria-label="Profile period ${i + 1} start" data-feature="start" data-profile-row="${i}" type="time" value="${escapeHTML(p.start)}" ${i === 0 ? "readonly" : ""}></label><label>Target (${escapeHTML(z.unit)})<input aria-label="Profile period ${i + 1} target" data-feature="temperature" data-profile-row="${i}" type="number" min="${z.limits.minimum}" max="${z.limits.maximum}" step="${z.limits.step || "any"}" value="${p.temperature}"></label><label>Name<input aria-label="Profile period ${i + 1} name" data-feature="label" data-profile-row="${i}" maxlength="80" value="${escapeHTML(p.label || "")}"></label>${i ? btn("Remove", "remove-period", disabled, `data-index="${i}" aria-label="Remove profile period ${i + 1}"`) : ""}</div>`).join("")}</div><div class="toolbar">${names.length ? btn("Add period", "add-period", disabled) : ""}${names.length ? btn("Delete profile", "delete-profile", disabled) : ""}</div><label>New profile name<input data-new-profile value="${escapeHTML(this._newProfileNames?.[z.id] || "")}" maxlength="40" placeholder="e.g. Day off" aria-label="New profile name"></label>${btn("Create from selected day", "create-profile", disabled)}<p class="muted">Copies ${escapeHTML(this._day.toUpperCase())} from this zone\u2019s saved week. Edit the copy here; your weekly schedule stays separate.</p></div>
     <div><h3>Workday rules</h3>${this._featureField("workday_entity", "Workday sensor (optional)", s.workday_entity, "text", 'list="feature-entities" placeholder="binary_sensor.workday"')}<label>On a workday<select data-feature="workday_profile">${this._profileOptions(s.workday_profile)}</select></label><label>On a non-workday<select data-feature="non_workday_profile">${this._profileOptions(s.non_workday_profile)}</select></label><p class="muted">Uses your Home Assistant Workday integration, including its configured public holidays. Leave the sensor empty to use only calendar rules.</p><h3>Calendar rules</h3>${s.calendar_rules.map((r, i) => `<div class="calendar-rule"><label>Calendar<input data-feature="entity_id" data-rule-row="${i}" value="${escapeHTML(r.entity_id)}" list="feature-entities" placeholder="calendar.example"></label><label>Event title contains<input data-feature="match" data-rule-row="${i}" value="${escapeHTML(r.match)}" placeholder="Blank matches any event" maxlength="80"></label><label>Use profile<select data-feature="profile" data-rule-row="${i}">${this._profileOptions(r.profile, "Choose a profile")}</select></label>${btn("Remove rule", "remove-rule", disabled, `data-index="${i}"`)}</div>`).join("")}${btn("Add calendar rule", "add-rule", disabled || !names.length)}<p class="muted">Rules run from top to bottom. Missing inputs show a warning and fall back to the remaining rules. Event titles are used for matching and excluded from history.</p></div></div></fieldset>${this._featureSaveBar()}</section>`;
     },
     _featureSaveBar() {
@@ -398,11 +471,11 @@
             if (this._newProfileNames) delete this._newProfileNames[z.id];
           }
           if (action === "add-period") {
-            const periods = s.profiles[this._profileName], last = periods.at(-1);
-            if (periods.length >= 96 || last.start === "23:59") throw Error("No space for another period.");
+            const periods2 = s.profiles[this._profileName], last = periods2.at(-1);
+            if (periods2.length >= 96 || last.start === "23:59") throw Error("No space for another period.");
             const minutes2 = Number(last.start.slice(0, 2)) * 60 + Number(last.start.slice(3));
             const next = Math.min(1439, minutes2 + 60);
-            periods.push({ start: `${String(Math.floor(next / 60)).padStart(2, "0")}:${String(next % 60).padStart(2, "0")}`, temperature: last.temperature, label: "" });
+            periods2.push({ start: `${String(Math.floor(next / 60)).padStart(2, "0")}:${String(next % 60).padStart(2, "0")}`, temperature: last.temperature, label: "" });
           }
           if (action === "remove-period") s.profiles[this._profileName].splice(Number(data.index), 1);
           if (action === "delete-profile") {
@@ -418,7 +491,7 @@
             this._render();
             return;
           }
-          for (const periods of Object.values(s.profiles)) validateWeek(Object.fromEntries(DAYS.map((day) => [day, periods])), z.limits);
+          for (const periods2 of Object.values(s.profiles)) validateWeek(Object.fromEntries(DAYS.map((day) => [day, periods2])), z.limits);
         }
         const payload = { revision: this._featureDraft?.revision ?? z.insights.revision };
         if (command === "insights") payload.settings = clone(this._featureDraft.settings);
@@ -1047,6 +1120,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       });
       this.shadowRoot.addEventListener("input", (event) => {
         const target = event.target;
+        this._receiverInput(target);
         this._featureInput(target);
         if (target.hasAttribute("data-import-text") && this._dialog?.kind === "import-week") {
           this._dialog.text = target.value;
@@ -1319,8 +1393,8 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       if (!this._canEdit()) return;
       this._view = "schedules";
       this._day = day;
-      const periods = this._week()[day], period = periods[index];
-      this._dialog = { kind: "period", day, index, edit: { ...period, temperature: String(period.temperature), end: periods[index + 1]?.start || "24:00" } };
+      const periods2 = this._week()[day], period = periods2[index];
+      this._dialog = { kind: "period", day, index, edit: { ...period, temperature: String(period.temperature), end: periods2[index + 1]?.start || "24:00" } };
       this._dialogError = "";
       this._focusDialog = true;
       this._render();
@@ -1353,6 +1427,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
     }
     _action(action, data = {}) {
+      if (action.startsWith("receiver-")) {
+        void this._receiverAction(action.slice(9), data);
+        return;
+      }
       if (action.startsWith("transfer-")) {
         void this._transferAction(action.slice(9));
         return;
@@ -1499,10 +1577,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       const zone = this._zone();
       return `<label class="zone-select">Heating zone<select data-action="zone-select" aria-label="Heating zone">${this._data.zones.map((z) => `<option value="${escapeHTML(z.id)}" ${z.id === zone.id ? "selected" : ""}>${escapeHTML(z.name)}</option>`).join("")}</select></label>`;
     }
-    _timeline(periods, day, editable = false) {
-      const baseline = Math.min(...periods.map((p) => p.temperature));
-      return `<div class="timeline" aria-label="${escapeHTML(DAY_NAMES[DAYS.indexOf(day)])} temperature periods">${periods.map((period, index) => {
-        const end = periods[index + 1]?.start || "24:00";
+    _timeline(periods2, day, editable = false) {
+      const baseline = Math.min(...periods2.map((p) => p.temperature));
+      return `<div class="timeline" aria-label="${escapeHTML(DAY_NAMES[DAYS.indexOf(day)])} temperature periods">${periods2.map((period, index) => {
+        const end = periods2[index + 1]?.start || "24:00";
         const width = (minutes(end, true) - minutes(period.start)) / 1440 * 100;
         return `<button type="button" class="segment ${period.temperature > baseline ? "comfort" : ""}" style="flex:${width} 1 0" data-action="edit" data-day="${day}" data-index="${index}" ${editable && this._canEdit() ? "" : "disabled"} aria-label="${escapeHTML(`${period.label || "Period"} ${period.start} to ${end}, ${this._temp(period.temperature)}. ${editable && this._canEdit() ? "Edit period" : "Scheduled target"}`)}">${escapeHTML(this._temp(period.temperature))}</button>`;
       }).join("")}</div>`;
@@ -1529,14 +1607,14 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       <section class="panel"><h2>Why this temperature?</h2><div class="reason"><b>${escapeHTML(SOURCES[zone.source] || zone.source)} \xB7 ${escapeHTML(this._temp(zone.proposed_target))}</b><p>${escapeHTML(zone.reason)}</p></div><small>${this._data.observe_only ? "This is the scheduler\u2019s proposed target. Existing controls still manage the heating." : "This scheduler controls the mapped thermostat. Manual Off and higher-priority overrides are respected."}</small></section></div>`;
     }
     _schedules() {
-      const zone = this._zone(), week = this._week(), periods = week[this._day];
+      const zone = this._zone(), week = this._week(), periods2 = week[this._day];
       const otherZones = this._data.zones.filter((z) => z.id !== zone.id && z.unit === zone.unit);
       return `<div class="zone-picker"><div><div class="eyebrow">Normal weekly schedule</div><h2>${escapeHTML(zone.name)}</h2><div class="status-caption">${this._canEdit() ? "Select a period to edit its time and temperature." : "Read-only schedule. Ask an administrator to make changes."}</div></div>${this._selector()}</div>
       <div class="toolbar" style="margin-bottom:16px">${button("Copy day", "copy-day", this._canEdit() ? "" : "disabled")}${button("Copy week from zone", "copy-week", otherZones.length && this._canEdit() ? "" : "disabled")}${button("Undo", "undo", this._history.length && !this._saving ? "" : "disabled")}</div>
       ${this._conflict ? `<div class="error" role="alert">This week changed elsewhere. Your unsaved draft has been kept. ${button("Load latest", "latest")}</div>` : ""}
       <div class="planner-layout"><section class="panel desktop-only"><div class="section-head"><h3>Seven-day overview</h3><small>${escapeHTML(zone.unit)}</small></div><div class="ticks" style="margin:0 0 10px 53px"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>${DAYS.map((day, index) => `<div class="week-row ${day === this._day ? "active" : ""}">${button(DAY_NAMES[index].slice(0, 3), "day", `data-day="${day}" aria-pressed="${day === this._day}"`)}<div>${this._timeline(week[day], day, true)}${this._occupancyBand(zone, day)}</div></div>`).join("")}<div class="legend"><span><i></i>Comfort</span><span><i class="cool"></i>Setback</span></div></section>
-      <section class="panel"><div class="section-head"><h3>${escapeHTML(DAY_NAMES[DAYS.indexOf(this._day)])} periods</h3><small>${periods.length} periods</small></div><div class="days">${DAYS.map((day, index) => button(DAY_NAMES[index].slice(0, 3), "day", `data-day="${day}" aria-pressed="${day === this._day}"`, day === this._day ? "selected" : "")).join("")}</div>
-      ${this._occupancySummary(zone, this._day)}<div class="period-list">${periods.map((period, index) => `<div class="period-row"><div><b>${escapeHTML(period.label || "Period " + (index + 1))}</b><p>${escapeHTML(period.start)} \u2013 ${escapeHTML(periods[index + 1]?.start || "24:00")}</p></div><span class="temp-pill ${period.temperature > Math.min(...periods.map((p) => p.temperature)) ? "warm" : ""}">${escapeHTML(this._temp(period.temperature))}</span>${button("\u270E", "edit", `data-index="${index}" aria-label="Edit ${escapeHTML(period.label || "period")} ${escapeHTML(period.start)}" ${this._canEdit() ? "" : "disabled"}`, "link-button")}</div>`).join("")}</div>
+      <section class="panel"><div class="section-head"><h3>${escapeHTML(DAY_NAMES[DAYS.indexOf(this._day)])} periods</h3><small>${periods2.length} periods</small></div><div class="days">${DAYS.map((day, index) => button(DAY_NAMES[index].slice(0, 3), "day", `data-day="${day}" aria-pressed="${day === this._day}"`, day === this._day ? "selected" : "")).join("")}</div>
+      ${this._occupancySummary(zone, this._day)}<div class="period-list">${periods2.map((period, index) => `<div class="period-row"><div><b>${escapeHTML(period.label || "Period " + (index + 1))}</b><p>${escapeHTML(period.start)} \u2013 ${escapeHTML(periods2[index + 1]?.start || "24:00")}</p></div><span class="temp-pill ${period.temperature > Math.min(...periods2.map((p) => p.temperature)) ? "warm" : ""}">${escapeHTML(this._temp(period.temperature))}</span>${button("\u270E", "edit", `data-index="${index}" aria-label="Edit ${escapeHTML(period.label || "period")} ${escapeHTML(period.start)}" ${this._canEdit() ? "" : "disabled"}`, "link-button")}</div>`).join("")}</div>
       <div class="toolbar" style="margin-top:14px">${button("+ Add period", "split", this._canEdit() ? "" : "disabled")}</div><div class="status-caption">New periods split the first block. Use \u201CSplit period\u201D when editing another block.</div></section></div>
       <div class="draft-bar"><span class="${this._draft ? "dirty" : "muted"}">${this._draft ? "\u25CF Unsaved changes" : "All changes saved"}${this._config.demo ? " \xB7 Demo only" : ""}</span><div class="toolbar">${button("Cancel", "cancel-draft", this._draft && !this._saving ? "" : "disabled")}${button(this._saving ? "Saving\u2026" : "Save changes", "save", this._draft && this._canEdit() && !this._saving ? "" : "disabled", "primary")}</div></div>${this._profilesPanel()}`;
     }
@@ -1555,7 +1633,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       const z = this._zone();
       const zoneDetails = `<div class="fact-row"><span>Thermostat</span><b>${escapeHTML(z.climate_entity || "Sample thermostat")}</b></div><div class="fact-row"><span>Reviewed limits</span><b>${escapeHTML(this._temp(z.limits.minimum))} \u2013 ${escapeHTML(this._temp(z.limits.maximum))}</b></div><div class="fact-row"><span>Temperature step</span><b>${z.limits.step ? escapeHTML(this._temp(z.limits.step)) : "Not reported"}</b></div><div class="fact-row"><span>Manual temperature</span><b>${escapeHTML({ next_period: "Until next period", duration: `${z.manual_minutes} minutes`, until_resume: "Until resumed" }[z.manual_policy])}</b></div>${!this._config.demo && this._data.can_edit ? '<a class="shs-link" href="/config/integrations/integration/smart_heating_scheduler">Manage thermostat and limits \u2192</a>' : ""}`;
       const appearance = `<section class="panel"><h3>Card appearance</h3><label>Theme<select data-action="theme-select" aria-label="Card theme">${["auto", "dark", "light"].map((t) => `<option value="${t}" ${this._config.theme === t ? "selected" : ""}>${{ auto: "Follow Home Assistant", dark: "Dark", light: "Light" }[t]}</option>`).join("")}</select></label></section>`;
-      return `<div class="zone-picker"><div><div class="eyebrow">Make this zone work for you</div><h2>Settings</h2></div><div class="zone-management">${this._selector()}${this._addZoneShortcut()}</div></div><p class="zone-help muted">Add a zone for each thermostat in Home Assistant, then choose it here.</p><div class="settings-stack">${this._disclosure("setup-guide", "Guided zone setup", '<ol><li>Choose a thermostat and zone name.</li><li>Review its temperature limits and starting all-day schedule.</li><li>Choose boost, occupancy, preheating and frost options.</li><li>Review the summary. New zones start disabled; enable them after reviewing their schedule.</li></ol><p class="muted">Use Add heating zone above, then Guided setup. Existing zones keep their current settings.</p>', "Four steps for adding a thermostat")}${this._disclosure("zone", "Zone settings", zoneDetails, `${z.name} \xB7 thermostat, limits and manual override`)}<div class="settings-section-title"><h3>Smart features</h3><p class="muted">Optional features for this zone. Open a feature to adjust its options.</p></div><div class="settings-grid">${this._occupancySettings()}${this._preheatSettings()}</div>${this._disclosure("frost", "Frost protection", this._frostSettings(), this._zone().insights?.settings.frost_enabled ? "Enabled for this zone" : "Optional minimum temperature \xB7 disabled")}${this._transferPanel()}${this._disclosure("advanced", "Advanced settings", `<div class="settings-grid">${this._smartSettings()}${appearance}</div>`, "Boost adapters, heating control mode and appearance")}</div>`;
+      return `<div class="zone-picker"><div><div class="eyebrow">Make this zone work for you</div><h2>Settings</h2></div><div class="zone-management">${this._selector()}${this._addZoneShortcut()}</div></div><p class="zone-help muted">Add a zone for each thermostat in Home Assistant, then choose it here.</p><div class="settings-stack">${this._disclosure("setup-guide", "Guided zone setup", '<ol><li>Choose a thermostat and zone name.</li><li>Review its temperature limits and starting all-day schedule.</li><li>Choose boost, occupancy, preheating and frost options.</li><li>Review the summary. New zones start disabled; enable them after reviewing their schedule.</li></ol><p class="muted">Use Add heating zone above, then Guided setup. Existing zones keep their current settings.</p>', "Four steps for adding a thermostat")}${this._disclosure("zone", "Zone settings", zoneDetails, `${z.name} \xB7 thermostat, limits and manual override`)}<div class="settings-section-title"><h3>Smart features</h3><p class="muted">Optional features for this zone. Open a feature to adjust its options.</p></div><div class="settings-grid">${this._occupancySettings()}${this._preheatSettings()}</div>${this._disclosure("frost", "Frost protection", this._frostSettings(), this._zone().insights?.settings.frost_enabled ? "Enabled for this zone" : "Optional minimum temperature \xB7 disabled")}${this._transferPanel()}${this._receiverPanel()}${this._disclosure("advanced", "Advanced settings", `<div class="settings-grid">${this._smartSettings()}${appearance}</div>`, "Boost adapters, heating control mode and appearance")}</div>`;
     }
     _modal() {
       if (!this._dialog) return "";
@@ -1571,9 +1649,9 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
         title = "Confirm external boost restoration";
         content = `<p>Only confirm after checking that the stop script has finished restoring the receiver and the external timer is idle.</p><div class="toolbar">${button("Cancel", "close")}${button("Restoration completed", "smart-confirm-reconcile", "", "primary")}</div>`;
       } else if (dialog.kind === "period") {
-        const { edit, index } = dialog, periods = this._week()[dialog.day], zone = this._zone();
+        const { edit, index } = dialog, periods2 = this._week()[dialog.day], zone = this._zone();
         title = "Edit period";
-        content = `<p>${escapeHTML(DAY_NAMES[DAYS.indexOf(dialog.day)])} \xB7 ${escapeHTML(zone.name)}</p><form><div class="form-grid"><label class="full">Period name<input data-field="label" maxlength="80" value="${escapeHTML(edit.label)}"></label><label>Start time<input data-field="start" aria-label="Start time" inputmode="numeric" value="${escapeHTML(edit.start)}" ${index === 0 ? "readonly" : ""}></label><label>End time<input data-field="end" aria-label="End time" inputmode="numeric" value="${escapeHTML(edit.end)}" ${index === periods.length - 1 ? "readonly" : ""}></label><label class="full">Target temperature (${escapeHTML(zone.unit)})<input type="number" data-field="temperature" aria-label="Target temperature" min="${zone.limits.minimum}" max="${zone.limits.maximum}" step="${zone.limits.step || "any"}" value="${escapeHTML(edit.temperature)}" required></label></div><div class="status-caption">Changing an end time also moves the next period\u2019s start.</div>${this._dialogError ? `<div class="error" role="alert">${escapeHTML(this._dialogError)}</div>` : ""}<div class="toolbar">${button("Split period", "split", `data-index="${index}"`)}${button("Delete", "delete", `data-index="${index}" ${index ? "" : "disabled"}`)}${button("Cancel", "close")}<button type="submit" class="primary">Apply period</button></div></form>`;
+        content = `<p>${escapeHTML(DAY_NAMES[DAYS.indexOf(dialog.day)])} \xB7 ${escapeHTML(zone.name)}</p><form><div class="form-grid"><label class="full">Period name<input data-field="label" maxlength="80" value="${escapeHTML(edit.label)}"></label><label>Start time<input data-field="start" aria-label="Start time" inputmode="numeric" value="${escapeHTML(edit.start)}" ${index === 0 ? "readonly" : ""}></label><label>End time<input data-field="end" aria-label="End time" inputmode="numeric" value="${escapeHTML(edit.end)}" ${index === periods2.length - 1 ? "readonly" : ""}></label><label class="full">Target temperature (${escapeHTML(zone.unit)})<input type="number" data-field="temperature" aria-label="Target temperature" min="${zone.limits.minimum}" max="${zone.limits.maximum}" step="${zone.limits.step || "any"}" value="${escapeHTML(edit.temperature)}" required></label></div><div class="status-caption">Changing an end time also moves the next period\u2019s start.</div>${this._dialogError ? `<div class="error" role="alert">${escapeHTML(this._dialogError)}</div>` : ""}<div class="toolbar">${button("Split period", "split", `data-index="${index}"`)}${button("Delete", "delete", `data-index="${index}" ${index ? "" : "disabled"}`)}${button("Cancel", "close")}<button type="submit" class="primary">Apply period</button></div></form>`;
       } else if (dialog.kind === "discard") {
         title = "Unsaved changes";
         content = `<p>Keep editing, or discard your unsaved changes before leaving.</p><div class="toolbar">${button("Keep editing", "close")}${button("Discard changes", "discard", "", "primary")}</div>`;
@@ -1636,7 +1714,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.65}.
       }
     }
   };
-  Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, insightsUI, transferUI);
+  Object.assign(SmartHeatingSchedulerCard.prototype, smartUI, occupancyUI, miniUI, insightsUI, transferUI, receiverUI);
   var SmartHeatingSchedulerCardEditor = class extends HTMLElement {
     constructor() {
       super();
