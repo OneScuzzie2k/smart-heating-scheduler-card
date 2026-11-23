@@ -451,3 +451,14 @@ test('fresh receiver Off disables Hive and classic dials despite a stale HA Heat
     }finally{h.close();}
   }
 });
+
+
+test('Hive mini More opens its configured scheduler directly and status describes the current mode',async()=>{
+  const h=await setup({demo:true,layout:'mini',thermostat_style:'hive',dashboard_path:'/heating-scheduler-preview/heating'});try{
+    const z=h.card._miniZone();z.receiver={schedule_owner:'receiver',ownership:{hardware:{mode:'schedule'}}};z.source='schedule';h.card._render();
+    const link=h.root.querySelector('a.hive-more');assert.ok(link);assert.equal(link.getAttribute('href'),'/heating-scheduler-preview/heating');assert.equal(h.root.querySelector('[data-action="hive-more"]'),null);
+    assert.equal(h.root.querySelector('.hive-context').textContent,'Following schedule');assert.doesNotMatch(h.root.textContent,/Schedule stored on receiver/);
+    for(const [mode,text] of [['manual','Manual temperature'],['off','Heating off']]){z.receiver.ownership.hardware.mode=mode;h.card._render();assert.equal(h.root.querySelector('.hive-context').textContent,text);}
+    h.card._config.dashboard_path='//example.com';h.card._render();assert.equal(h.root.querySelector('a.hive-more'),null);assert.ok(h.root.querySelector('[data-action="hive-more"]'));
+  }finally{h.close();}
+});
